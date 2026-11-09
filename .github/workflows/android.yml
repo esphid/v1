@@ -9,7 +9,9 @@
 # Without signing secrets release APK/AAB are unsigned; Play is skipped.
 name: Android
 on:
+  # Branch pushes only: a release's tag is built by the release event, not twice.
   push:
+    branches: ['**']
   pull_request:
   release:
     types: [published]
@@ -17,8 +19,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: android-${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
-  cancel-in-progress: true
+  # Keyed by event so a branch build can never cancel a release build.
+  group: android-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 jobs:
   build:
     runs-on: ubuntu-latest

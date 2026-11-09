@@ -146,7 +146,7 @@ cd android && ./gradlew :core:testDebugUnitTest :app:assembleDebug
 
 ## CI/CD and releases
 
-Three workflows in [`.github/workflows`](.github/workflows) run on **every push and pull
+Three workflows in [`.github/workflows`](.github/workflows) run on **every branch push and pull
 request**, and on **published releases**:
 
 | Workflow | On push / PR | On release |

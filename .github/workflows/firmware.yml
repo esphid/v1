@@ -1,6 +1,8 @@
 name: Firmware
 on:
+  # Branch pushes only: a release's tag is built by the release event, not twice.
   push:
+    branches: ['**']
   pull_request:
   release:
     types: [published]
@@ -8,7 +10,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  # Keyed by event so a branch build can never cancel a release build.
+  group: firmware-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'release' }}
 jobs:
   host-tests:
