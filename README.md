@@ -175,7 +175,7 @@ secrets are missing.
 | `IOS_BUNDLE_ID` | variable | Defaults to `com.scalexy.esphid` |
 | `IOS_SUBMIT_FOR_REVIEW` | variable | `true` also submits the build for App Store review |
 | `IOS_BUILD_NUMBER_OFFSET` | variable | Added to the run number |
-| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | Release signing |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEYSTORE_ALIAS`, `ANDROID_KEYSTORE_ALIAS_PASSWORD` | secrets | Release signing |
 | `PLAY_SERVICE_ACCOUNT_JSON` | secret | Google Play service account with release access |
 | `PLAY_TRACK` / `PLAY_RELEASE_STATUS` | variables | Default `internal` / `completed` |
 | `ANDROID_VERSION_CODE_OFFSET` | variable | Added to the run number |

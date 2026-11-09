@@ -18,8 +18,8 @@ android {
         signingConfigs.create("release") {
             storeFile = file(keyPath)
             storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEYSTORE_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEYSTORE_ALIAS_PASSWORD")
         }
     buildTypes {
         release {

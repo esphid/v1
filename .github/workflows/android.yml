@@ -1,6 +1,6 @@
 # Secrets:
 # ANDROID_KEYSTORE_BASE64: base64-encoded release JKS/keystore (optional).
-# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD: signing credentials.
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEYSTORE_ALIAS, ANDROID_KEYSTORE_ALIAS_PASSWORD: signing credentials.
 # PLAY_SERVICE_ACCOUNT_JSON: Google Play service-account JSON with publishing access (optional).
 # Variables:
 # ANDROID_VERSION_CODE_OFFSET: integer added to github.run_number (default 0).
@@ -33,8 +33,8 @@ jobs:
     env:
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+      ANDROID_KEYSTORE_ALIAS_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_ALIAS_PASSWORD }}
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
       VERSION_OFFSET: ${{ vars.ANDROID_VERSION_CODE_OFFSET || '0' }}
       RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -62,7 +62,7 @@ jobs:
           [[ "$VERSION_OFFSET" =~ ^[0-9]+$ ]]
           echo "VERSION_NAME=$version" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$((GITHUB_RUN_NUMBER + VERSION_OFFSET))" >> "$GITHUB_ENV"
-          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEYSTORE_ALIAS" && -n "$ANDROID_KEYSTORE_ALIAS_PASSWORD" ]]; then
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/esphid-release.jks"
             chmod 600 "$RUNNER_TEMP/esphid-release.jks"
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/esphid-release.jks" >> "$GITHUB_ENV"

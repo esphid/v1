@@ -84,8 +84,8 @@ Release APK: `app/build/outputs/apk/release/app-release-unsigned.apk`.
 
 ## CI credentials and variables
 
-Secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
-ANDROID_KEY_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON.
+Secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEYSTORE_ALIAS,
+ANDROID_KEYSTORE_ALIAS_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON.
 Variables: ANDROID_VERSION_CODE_OFFSET (0), PLAY_TRACK (internal),
 PLAY_RELEASE_STATUS (completed; draft allowed).
 Signing is configured only when the workflow has all four signing secrets. Play

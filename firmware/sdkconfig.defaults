@@ -48,7 +48,10 @@ CONFIG_ML_H2_BUFFER_SIZE_KB=64
 # CONFIG_ML_ENABLE_CELLULAR is not set
 CONFIG_MBEDTLS_X509_CREATE_C=y
 CONFIG_MBEDTLS_PK_WRITE_C=y
-CONFIG_BT_NIMBLE_SM_SC_ONLY=1
+# LE Secure Connections only, via SM_LEGACY off. NimBLE's SC_ONLY mode would also demand
+# MITM (security level 4), which a NoInputNoOutput device can never reach, so every
+# encrypted characteristic would fail with "insufficient authentication".
+CONFIG_BT_NIMBLE_SM_SC_ONLY=0
 # CONFIG_BT_NIMBLE_SM_LEGACY is not set
 CONFIG_MBEDTLS_CHACHA20_C=y
 CONFIG_MBEDTLS_CHACHAPOLY_C=y
@@ -65,3 +68,8 @@ CONFIG_CJSON_CIRCULAR_LIMIT=32
 # Deliver queued WebSocket timeout/reply work reliably under control-mailbox load.
 # Only workers/events/watchdog enqueue work; receive callbacks never wait here.
 CONFIG_HTTPD_QUEUE_WORK_BLOCKING=y
+# Each HTTPS session otherwise holds a 16 KB receive and 4 KB send buffer in internal RAM
+# for its whole life; with several sessions plus Wi-Fi, BLE and Tailscale the heap runs out
+# and new handshakes fail in mbedtls_ssl_setup (PSA_ERROR_INSUFFICIENT_MEMORY, -0x008D).
+# Dynamic buffers are allocated per record and released when idle.
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
