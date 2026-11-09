@@ -1,0 +1,38 @@
+.DS_Store
+# firmware
+firmware/build/
+firmware/managed_components/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/dependencies.lock.bak
+# host tests
+build-host/
+# iOS
+ios/*.xcodeproj
+ios/build/
+ios/DerivedData/
+*.xcuserstate
+xcuserdata/
+ios/ESPHIDKit/.build/
+ios/ESPHIDKit/.swiftpm/
+ios/fastlane/report.xml
+ios/fastlane/README.md
+*.ipa
+*.dSYM.zip
+# Android
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/.kotlin/
+*.keystore
+*.jks
+# secrets
+*.p8
+*.p12
+*.mobileprovision
+play-service-account.json
+ios/ESPHID-simulator.zip
+ios/.bundle/
+ios/vendor/bundle/
+firmware/test/host/build/

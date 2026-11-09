@@ -1,0 +1,124 @@
+# Secrets:
+# ANDROID_KEYSTORE_BASE64: base64-encoded release JKS/keystore (optional).
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD: signing credentials.
+# PLAY_SERVICE_ACCOUNT_JSON: Google Play service-account JSON with publishing access (optional).
+# Variables:
+# ANDROID_VERSION_CODE_OFFSET: integer added to github.run_number (default 0).
+# PLAY_TRACK: Play track (default internal).
+# PLAY_RELEASE_STATUS: completed (default) or draft.
+# Without signing secrets release APK/AAB are unsigned; Play is skipped.
+name: Android
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: android
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      VERSION_OFFSET: ${{ vars.ANDROID_VERSION_CODE_OFFSET || '0' }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Version and signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=0.0.0-dev
+          if [[ -n "$RELEASE_TAG" ]]; then version="${RELEASE_TAG#v}"; fi
+          [[ "$version" =~ ^[A-Za-z0-9._+-]+$ ]]
+          [[ "$VERSION_OFFSET" =~ ^[0-9]+$ ]]
+          echo "VERSION_NAME=$version" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((GITHUB_RUN_NUMBER + VERSION_OFFSET))" >> "$GITHUB_ENV"
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/esphid-release.jks"
+            chmod 600 "$RUNNER_TEMP/esphid-release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/esphid-release.jks" >> "$GITHUB_ENV"
+          fi
+      - name: Unit tests, lint, debug APK
+        run: ./gradlew :core:testDebugUnitTest :app:assembleDebug lint -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-debug-and-reports
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/core/build/reports/
+            android/core/build/test-results/
+            android/app/build/reports/
+      - name: Release APK and bundle
+        if: github.event_name == 'release'
+        run: ./gradlew :app:assembleRelease :app:bundleRelease -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+      - name: Collect release files
+        if: github.event_name == 'release'
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          suffix=""
+          if [[ -z "${ANDROID_KEYSTORE_PATH:-}" ]]; then
+            suffix="-unsigned"
+            echo 'Signing secrets absent: release APK and AAB are unsigned.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          mkdir -p "$RUNNER_TEMP/release"
+          cp "$apk" "$RUNNER_TEMP/release/esphid-android-$VERSION_NAME$suffix.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/release/esphid-android-$VERSION_NAME$suffix.aab"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'release'
+        with:
+          name: android-release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+      # Action keeps Play publishing out of the local Gradle plugin/dependency graph.
+      - name: Upload to Google Play
+        if: github.event_name == 'release' && env.PLAY_SERVICE_ACCOUNT_JSON != '' && env.ANDROID_KEYSTORE_PATH != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: dev.scalexy.esphid
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/esphid-release.jks"
+  release-assets:
+    # Only this job can write to the repository; build steps never see a write token.
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: release
+      - name: Attach to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" release/* --clobber

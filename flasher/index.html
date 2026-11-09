@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Install ESPHID</title>
+<meta name="description" content="Flash ESPHID firmware onto an ESP32-S3 from your browser.">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+/* Hallmark · page: web flasher · genre: modern-minimal · theme: custom (shared with the ESPHID console)
+ * vibe: "bench instrument, amber indicator, graphite" · accent oklch(66–76% .16 55) amber · system-ui + ui-monospace
+ */
+:root{
+  --color-paper:oklch(97.5% .004 80);--color-surface:oklch(99.6% .002 80);--color-sunken:oklch(94.2% .005 80);
+  --color-line:oklch(88.5% .006 75);--color-line-strong:oklch(78% .008 70);
+  --color-ink:oklch(23% .01 60);--color-ink-2:oklch(43% .01 65);--color-ink-3:oklch(56% .008 70);
+  --color-accent:oklch(72% .165 58);--color-accent-strong:oklch(66% .17 52);--color-accent-ink:oklch(50% .14 50);
+  --color-on-accent:oklch(21% .03 55);--color-accent-wash:oklch(93% .045 70);--color-focus:oklch(48% .15 50);--color-bad:oklch(53% .19 27);
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-12:48px;--space-16:64px;
+  --radius-m:10px;--radius-l:14px;--ease-out:cubic-bezier(.2,.8,.2,1);--dur-fast:110ms;
+}
+@media (prefers-color-scheme:dark){:root{
+  --color-paper:oklch(16.5% .008 60);--color-surface:oklch(20.5% .009 60);--color-sunken:oklch(13.5% .007 60);
+  --color-line:oklch(29% .01 60);--color-line-strong:oklch(39% .012 60);
+  --color-ink:oklch(94% .008 80);--color-ink-2:oklch(77% .01 75);--color-ink-3:oklch(63% .01 70);
+  --color-accent:oklch(77% .155 62);--color-accent-strong:oklch(72% .16 58);--color-accent-ink:oklch(81% .14 65);
+  --color-on-accent:oklch(20% .03 55);--color-accent-wash:oklch(28% .05 60);--color-focus:oklch(82% .14 65);--color-bad:oklch(70% .17 27);
+}}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--color-paper);color:var(--color-ink);font:400 1rem/1.55 var(--font-ui)}
+main{max-width:680px;margin:0 auto;padding:var(--space-12) var(--space-4) var(--space-16);display:grid;gap:var(--space-8)}
+h1,h2{font-style:normal;margin:0;line-height:1.15;letter-spacing:-.015em;overflow-wrap:anywhere;min-width:0}
+h1{font-size:clamp(2rem,7vw,2.75rem);font-weight:680}
+h2{font-size:1.125rem;font-weight:620}
+p{margin:0}
+code{font-family:var(--font-mono);font-size:.9em}
+a{color:var(--color-accent-ink);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.lede{display:grid;gap:var(--space-3)}
+.lede p{color:var(--color-ink-2);max-width:56ch;font-size:1.0625rem}
+.ver{font-family:var(--font-mono);font-size:.8125rem;color:var(--color-ink-3)}
+.boards{display:grid;gap:var(--space-2)}
+.board{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px var(--space-3);align-items:baseline;padding:var(--space-4);border:1px solid var(--color-line-strong);border-radius:var(--radius-m);background:var(--color-surface);cursor:pointer;transition:border-color var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out)}
+.board:hover{border-color:var(--color-ink-3)}
+.board input{position:absolute;opacity:0;pointer-events:none}
+.board code{grid-row:span 2;font-weight:650;font-size:.9375rem;color:var(--color-ink);min-width:7ch}
+.board strong{font-weight:600}
+.board small{color:var(--color-ink-2);font-size:.875rem}
+.board:has(input:checked){border-color:var(--color-accent-strong);background:var(--color-accent-wash)}
+.board:has(input:focus-visible){outline:2px solid var(--color-focus);outline-offset:2px}
+.install{display:grid;gap:var(--space-3);justify-items:start}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 var(--space-6);border-radius:var(--radius-m);border:1px solid var(--color-accent);background:var(--color-accent);color:var(--color-on-accent);font:600 1rem/1 var(--font-ui);cursor:pointer;white-space:nowrap;transition:background-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out)}
+.btn:hover{background:var(--color-accent-strong);border-color:var(--color-accent-strong)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.warn{color:var(--color-bad);font-size:.9375rem}
+ol{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:var(--space-4)}
+ol li{counter-increment:s;display:grid;grid-template-columns:28px minmax(0,1fr);gap:var(--space-3)}
+ol li::before{content:counter(s);display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--color-sunken);border:1px solid var(--color-line);font:600 .8125rem/1 var(--font-mono);color:var(--color-ink-2)}
+ol li p{color:var(--color-ink-2)}
+ol li strong{color:var(--color-ink);font-weight:600}
+.section{display:grid;gap:var(--space-4);padding-top:var(--space-6);border-top:1px solid var(--color-line)}
+footer{color:var(--color-ink-3);font-size:.875rem}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}.btn:active{transform:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="lede">
+    <h1>Install ESPHID</h1>
+    <p>Turns an ESP32-S3 board into a USB keyboard and mouse that your phone drives over Bluetooth, WiFi, Tailscale or MQTT. Flash it from this page in about a minute.</p>
+    <span class="ver" id="ver"></span>
+  </div>
+
+  <div class="section">
+    <h2>Pick your board</h2>
+    <p style="color:var(--color-ink-2)">The module name is printed on its metal shield, for example <code>ESP32-S3-WROOM-1-N16R8</code>. Match the part after the last dash.</p>
+    <div class="boards" role="radiogroup" aria-label="Board">
+      <label class="board"><input type="radio" name="v" value="s3-n8r8" checked><code>N8R8</code><strong>8 MB PSRAM (octal)</strong><small>Also N16R8 and N32R8. Best choice for Tailscale.</small></label>
+      <label class="board"><input type="radio" name="v" value="s3-n8r2"><code>N8R2</code><strong>2 MB PSRAM (quad)</strong><small>DevKitC-1 N8R2 and similar boards.</small></label>
+      <label class="board"><input type="radio" name="v" value="s3-n8"><code>N8</code><strong>No PSRAM</strong><small>Any ESP32-S3 with 8 MB of flash or more.</small></label>
+    </div>
+  </div>
+
+  <div class="section install">
+    <h2>Flash</h2>
+    <esp-web-install-button id="installer" manifest="manifest-s3-n8r8.json">
+      <button class="btn" slot="activate">Connect and install</button>
+      <p class="warn" slot="unsupported">This browser can't talk to USB devices. Open this page in Chrome or Edge on a computer.</p>
+      <p class="warn" slot="not-allowed">USB access needs a secure page. Open this page over https.</p>
+    </esp-web-install-button>
+  </div>
+
+  <div class="section">
+    <h2>Steps</h2>
+    <ol>
+      <li><p><strong>Plug the board into this computer.</strong> For the first install either USB port works. To re-install later over the port marked USB (not UART), hold BOOT while plugging it in, because ESPHID uses that port as a keyboard.</p></li>
+      <li><p><strong>Click Connect and install</strong>, choose the serial port, and keep the tab open until it finishes.</p></li>
+      <li><p><strong>Plug the board's USB port into the computer you want to control.</strong> It appears as a keyboard and mouse.</p></li>
+      <li><p><strong>Set it up.</strong> Open the ESPHID app and pick the device over Bluetooth, or join the <code>ESPHID-XXXXXX</code> WiFi network on any phone or laptop and follow the page that opens.</p></li>
+    </ol>
+  </div>
+
+  <footer id="foot">Later updates install over the air from the app or the device's own page. <a id="rel" href="#">All releases</a></footer>
+</main>
+<script type="module">
+const inst = document.getElementById('installer');
+const ver = document.getElementById('ver');
+async function showVersion(v) {
+  try { const m = await (await fetch(`manifest-${v}.json`, { cache: 'no-store' })).json(); ver.textContent = m.version ? `Firmware ${m.version}` : ''; }
+  catch { ver.textContent = ''; }
+}
+for (const r of document.querySelectorAll('input[name=v]')) r.addEventListener('change', () => { inst.setAttribute('manifest', `manifest-${r.value}.json`); showVersion(r.value); });
+showVersion('s3-n8r8');
+const owner = location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : null;
+const repo = location.pathname.split('/').filter(Boolean)[0];
+const rel = document.getElementById('rel');
+if (owner && repo) rel.href = `https://github.com/${owner}/${repo}/releases`; else rel.remove();
+</script>
+</body>
+</html>

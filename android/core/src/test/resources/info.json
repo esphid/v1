@@ -1,0 +1,21 @@
+{
+  "id": "A1B2C3",
+  "name": "ESPHID-A1B2C3",
+  "model": "esp32s3",
+  "fw_version": "1.2.0",
+  "fw_variant": "s3-n8r8",
+  "idf_version": "v6.0.2",
+  "proto": 1,
+  "claimed": true,
+  "uptime_s": 1234,
+  "free_heap": 123456,
+  "radio_mode": "both",
+  "usb": {"mounted": true, "suspended": false, "leds": 2},
+  "wifi": {"mode": "sta", "connected": true, "ssid": "Home", "ip": "192.168.1.50",
+           "rssi": -55, "mac": "AA:BB:CC:A1:B2:C3", "ap_active": false, "ap_ip": "192.168.4.1"},
+  "ble": {"enabled": true, "connections": 1},
+  "https": {"enabled": false, "port": 443, "fingerprint": ""},
+  "mqtt": {"enabled": false, "connected": false},
+  "tailscale": {"enabled": false, "state": "off", "ip": "", "hostname": ""},
+  "ota": {"state": "idle", "progress": 0, "repo": "owner/repo", "latest_url": "https://github.com/owner/repo/releases/latest/download/esphid-s3-n8r8.bin"}
+}

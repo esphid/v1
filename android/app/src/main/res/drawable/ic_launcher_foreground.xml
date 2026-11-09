@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- keycap body -->
+    <path android:fillColor="#3D3630" android:pathData="M42.14,34.79h21.14a6.19,6.19 0 0 1 6.19,6.19v21.14a6.19,6.19 0 0 1 -6.19,6.19h-21.14a6.19,6.19 0 0 1 -6.19,-6.19v-21.14a6.19,6.19 0 0 1 6.19,-6.19z"/>
+    <!-- keycap face -->
+    <path android:fillColor="#544B44" android:pathData="M43.68,36.6h18.05a4.25,4.25 0 0 1 4.25,4.25v19.09a4.25,4.25 0 0 1 -4.25,4.25h-18.05a4.25,4.25 0 0 1 -4.25,-4.25v-19.09a4.25,4.25 0 0 1 4.25,-4.25z"/>
+    <!-- amber indicator -->
+    <path android:fillColor="#F99B39" android:pathData="M43.17,42.08a1.74,1.74 0 1,0 3.48,0a1.74,1.74 0 1,0 -3.48,0"/>
+    <!-- pointer: dark outline then amber fill -->
+    <path android:strokeColor="#141110" android:strokeWidth="2.8" android:strokeLineJoin="round" android:fillColor="#141110"
+        android:pathData="M56.3,51.3L56.3,70.4L61.3,66.1L64.7,73.5L67.8,72.1L64.4,64.9L70.6,64.9Z"/>
+    <path android:fillColor="#F99B39" android:pathData="M56.3,51.3L56.3,70.4L61.3,66.1L64.7,73.5L67.8,72.1L64.4,64.9L70.6,64.9Z"/>
+</vector>

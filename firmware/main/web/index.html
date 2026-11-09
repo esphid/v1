@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>ESPHID Console</title>
+<style>
+/* Hallmark · app-scope: device console · genre: modern-minimal · theme: custom
+ * vibe: "bench instrument, amber indicator, graphite" · light paper oklch(97.5% .004 80) / dark paper oklch(16.5% .008 60)
+ * accent oklch(66–76% .16 55) amber · fonts: system-ui + ui-monospace (offline: served from device flash, no external assets)
+ * axes: light+dark / grotesk-sans + mono readouts / warm accent
+ */
+:root{
+  --color-paper:oklch(97.5% .004 80);--color-surface:oklch(99.6% .002 80);--color-sunken:oklch(94.2% .005 80);
+  --color-line:oklch(88.5% .006 75);--color-line-strong:oklch(78% .008 70);
+  --color-ink:oklch(23% .01 60);--color-ink-2:oklch(43% .01 65);--color-ink-3:oklch(56% .008 70);
+  --color-accent:oklch(72% .165 58);--color-accent-strong:oklch(66% .17 52);--color-accent-ink:oklch(50% .14 50);
+  --color-on-accent:oklch(21% .03 55);--color-accent-wash:oklch(93% .045 70);
+  --color-ok:oklch(56% .14 150);--color-warn:oklch(62% .14 75);--color-bad:oklch(53% .19 27);--color-bad-wash:oklch(94% .035 27);
+  --color-focus:oklch(48% .15 50);--color-dot:oklch(84% .006 75);--color-scrim:oklch(20% .01 60 / .45);
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --text-xs:.75rem;--text-s:.8125rem;--text-m:.9375rem;--text-l:1.125rem;--text-xl:1.375rem;--text-2xl:1.75rem;
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;
+  --radius-s:6px;--radius-m:10px;--radius-l:14px;--radius-pill:999px;
+  --ease-out:cubic-bezier(.2,.8,.2,1);--ease-in:cubic-bezier(.4,0,1,1);--ease-in-out:cubic-bezier(.6,0,.2,1);
+  --dur-fast:110ms;--dur:180ms;
+  --bar-h:56px;--tabs-h:64px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --color-paper:oklch(16.5% .008 60);--color-surface:oklch(20.5% .009 60);--color-sunken:oklch(13.5% .007 60);
+  --color-line:oklch(29% .01 60);--color-line-strong:oklch(39% .012 60);
+  --color-ink:oklch(94% .008 80);--color-ink-2:oklch(77% .01 75);--color-ink-3:oklch(63% .01 70);
+  --color-accent:oklch(77% .155 62);--color-accent-strong:oklch(72% .16 58);--color-accent-ink:oklch(81% .14 65);
+  --color-on-accent:oklch(20% .03 55);--color-accent-wash:oklch(28% .05 60);
+  --color-ok:oklch(74% .15 150);--color-warn:oklch(82% .14 88);--color-bad:oklch(70% .17 27);--color-bad-wash:oklch(27% .06 27);
+  --color-focus:oklch(82% .14 65);--color-dot:oklch(31% .01 60);--color-scrim:oklch(8% .01 60 / .6);
+}}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--color-paper);color:var(--color-ink);font:400 var(--text-m)/1.5 var(--font-ui);min-height:100dvh;-webkit-tap-highlight-color:transparent}
+h1,h2,h3{font-style:normal;margin:0;line-height:1.2;letter-spacing:-.01em;overflow-wrap:anywhere;min-width:0}
+h1{font-size:var(--text-2xl);font-weight:650}
+h2{font-size:var(--text-l);font-weight:620}
+h3{font-size:var(--text-m);font-weight:600}
+p{margin:0}
+code,.mono{font-family:var(--font-mono);font-size:.92em}
+a{color:var(--color-accent-ink);text-underline-offset:3px}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- header ---------- */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:var(--space-3);height:calc(var(--bar-h) + env(safe-area-inset-top));padding:env(safe-area-inset-top) max(var(--space-4),env(safe-area-inset-right)) 0 max(var(--space-4),env(safe-area-inset-left));background:var(--color-paper);border-bottom:1px solid var(--color-line)}
+.ident{display:flex;align-items:baseline;gap:var(--space-2);min-width:0;flex:1}
+.ident strong{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ident code{color:var(--color-ink-3);font-size:var(--text-xs)}
+.link{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-s);color:var(--color-ink-2);white-space:nowrap}
+.link code{color:var(--color-ink);font-size:var(--text-s);min-width:4.5ch;text-align:right}
+.led{width:8px;height:8px;border-radius:50%;background:var(--color-ink-3);flex:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--color-ink-3) 18%,transparent)}
+.led[data-s=live]{background:var(--color-ok);box-shadow:0 0 0 3px color-mix(in oklch,var(--color-ok) 22%,transparent)}
+.led[data-s=wait]{background:var(--color-accent)}
+.led[data-s=bad]{background:var(--color-bad)}
+
+/* ---------- shell ---------- */
+.shell{display:block}
+main{padding:var(--space-4) max(var(--space-4),env(safe-area-inset-right)) calc(var(--tabs-h) + var(--space-8) + env(safe-area-inset-bottom)) max(var(--space-4),env(safe-area-inset-left));max-width:820px;margin:0 auto}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:calc(var(--tabs-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--color-surface);border-top:1px solid var(--color-line)}
+.tab{appearance:none;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--color-ink-3);font-size:var(--text-xs);font-weight:550;cursor:pointer;white-space:nowrap;transition:color var(--dur-fast) var(--ease-out)}
+.tab svg{width:22px;height:22px}
+.tab:hover{color:var(--color-ink-2)}
+.tab[aria-selected=true]{color:var(--color-ink)}
+.tab[aria-selected=true] svg{color:var(--color-accent-strong)}
+.tab:focus-visible{outline-offset:-4px;border-radius:var(--radius-m)}
+@media (min-width:880px){
+  .shell{display:grid;grid-template-columns:220px minmax(0,1fr)}
+  .tabs{position:sticky;top:var(--bar-h);height:calc(100dvh - var(--bar-h));display:flex;flex-direction:column;gap:var(--space-1);padding:var(--space-4) var(--space-3);border-top:0;border-right:1px solid var(--color-line);background:var(--color-paper)}
+  .tab{flex-direction:row;justify-content:flex-start;gap:var(--space-3);height:40px;padding:0 var(--space-3);border-radius:var(--radius-m);font-size:var(--text-m)}
+  .tab svg{width:18px;height:18px}
+  .tab[aria-selected=true]{background:var(--color-sunken)}
+  main{padding:var(--space-8) var(--space-8) var(--space-12)}
+}
+.view{display:grid;gap:var(--space-6)}
+.view-head{display:grid;gap:var(--space-1)}
+.view-head p{color:var(--color-ink-2);max-width:60ch}
+
+/* ---------- panels & forms ---------- */
+.panel{background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-l);padding:var(--space-5);display:grid;gap:var(--space-4);min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap}
+.panel-head p,.hint{color:var(--color-ink-2);font-size:var(--text-s)}
+.field{display:grid;gap:6px;min-width:0}
+.field label,.label{font-size:var(--text-s);font-weight:560;color:var(--color-ink-2)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--space-4)}
+.input{width:100%;min-width:0;height:44px;padding:0 var(--space-3);border:1px solid var(--color-line-strong);border-radius:var(--radius-m);background:var(--color-paper);transition:border-color var(--dur-fast) var(--ease-out)}
+.input:hover{border-color:var(--color-ink-3)}
+.input:focus-visible{outline:2px solid var(--color-focus);outline-offset:0;border-color:transparent}
+.input:disabled{opacity:.55;cursor:not-allowed}
+.input[aria-invalid=true]{border-color:var(--color-bad)}
+.input.mono{font-family:var(--font-mono);font-size:var(--text-s)}
+select.input{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 18px) 19px,calc(100% - 13px) 19px;background-size:5px 5px;background-repeat:no-repeat;padding-right:var(--space-8)}
+.with-action{display:flex;gap:var(--space-2)}
+.with-action .input{flex:1}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);cursor:pointer;min-height:44px}
+.switch span{display:grid;gap:2px;min-width:0}
+.switch small{color:var(--color-ink-2);font-size:var(--text-s)}
+.switch input{appearance:none;flex:none;width:44px;height:26px;border-radius:var(--radius-pill);background:var(--color-line-strong);position:relative;cursor:pointer;margin:0;transition:background-color var(--dur) var(--ease-out)}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--color-surface);box-shadow:0 1px 2px oklch(0% 0 0 / .25);transition:transform var(--dur) var(--ease-out)}
+.switch input:checked{background:var(--color-accent-strong)}
+.switch input:checked::after{transform:translateX(18px)}
+.switch input:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2)}
+.seg label{position:relative;display:grid;gap:2px;padding:var(--space-3);border:1px solid var(--color-line-strong);border-radius:var(--radius-m);cursor:pointer;background:var(--color-paper);transition:border-color var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out)}
+.seg label:hover{border-color:var(--color-ink-3)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg strong{font-size:var(--text-m);font-weight:600}
+.seg small{font-size:var(--text-xs);color:var(--color-ink-2);line-height:1.35}
+.seg label:has(input:checked){border-color:var(--color-accent-strong);background:var(--color-accent-wash)}
+.seg label:has(input:focus-visible){outline:2px solid var(--color-focus);outline-offset:2px}
+@media (max-width:420px){.seg{grid-template-columns:minmax(0,1fr)}}
+.actions{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
+.form-msg{font-size:var(--text-s);color:var(--color-ink-2);min-height:1.5em}
+.form-msg[data-tone=bad]{color:var(--color-bad)}
+.form-msg[data-tone=ok]{color:var(--color-ok)}
+
+/* ---------- buttons (8 states) ---------- */
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);height:44px;padding:0 var(--space-4);border-radius:var(--radius-m);border:1px solid var(--color-line-strong);background:var(--color-surface);color:var(--color-ink);font-weight:580;white-space:nowrap;cursor:pointer;transition:background-color var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out)}
+.btn:hover{background:var(--color-sunken);border-color:var(--color-ink-3)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--color-accent);border-color:var(--color-accent);color:var(--color-on-accent)}
+.btn.primary:hover{background:var(--color-accent-strong);border-color:var(--color-accent-strong)}
+.btn.danger{color:var(--color-bad);border-color:color-mix(in oklch,var(--color-bad) 45%,var(--color-line))}
+.btn.danger:hover{background:var(--color-bad-wash)}
+.btn.ghost{border-color:transparent;background:none;color:var(--color-ink-2)}
+.btn.ghost:hover{background:var(--color-sunken);color:var(--color-ink)}
+.btn.small{height:34px;padding:0 var(--space-3);font-size:var(--text-s)}
+.btn[data-state=loading]{cursor:progress;color:transparent;position:relative}
+.btn[data-state=loading]::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid var(--color-ink-3);border-top-color:var(--color-ink);animation:spin .7s linear infinite}
+.btn.primary[data-state=loading]::after{border-color:color-mix(in oklch,var(--color-on-accent) 35%,transparent);border-top-color:var(--color-on-accent)}
+.btn[data-state=success]{border-color:var(--color-ok)}
+.btn[data-state=error]{border-color:var(--color-bad)}
+@keyframes spin{to{transform:rotate(1turn)}}
+
+/* ---------- readouts ---------- */
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:1px;background:var(--color-line);border:1px solid var(--color-line);border-radius:var(--radius-l);overflow:hidden}
+.readout div{background:var(--color-surface);padding:var(--space-3) var(--space-4);display:grid;gap:2px;min-width:0}
+.readout dt{font-size:var(--text-xs);color:var(--color-ink-3);font-weight:560}
+.readout dd{margin:0;font-family:var(--font-mono);font-size:var(--text-s);overflow-wrap:anywhere}
+.readout dd[data-tone=ok]{color:var(--color-ok)}
+.readout dd[data-tone=bad]{color:var(--color-bad)}
+.readout dd[data-tone=dim]{color:var(--color-ink-3)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);font-size:var(--text-xs);font-weight:560;background:var(--color-sunken);color:var(--color-ink-2);white-space:nowrap}
+.chip .led{width:6px;height:6px;box-shadow:none}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-3) var(--space-4);border-radius:var(--radius-m);background:var(--color-accent-wash);border:1px solid color-mix(in oklch,var(--color-accent-strong) 40%,transparent);font-size:var(--text-s)}
+
+/* ---------- control: trackpad ---------- */
+.pad-wrap{display:grid;border:1px solid var(--color-line-strong);border-radius:var(--radius-l);overflow:hidden;background:var(--color-line-strong);gap:1px}
+.pad{position:relative;height:clamp(220px,46dvh,520px);background-color:var(--color-sunken);background-image:radial-gradient(var(--color-dot) 1px,transparent 1.2px);background-size:16px 16px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair;display:grid;place-items:center}
+.pad-hint{color:var(--color-ink-3);font-size:var(--text-s);text-align:center;padding:var(--space-4);pointer-events:none;transition:opacity var(--dur) var(--ease-out)}
+.pad.active .pad-hint{opacity:0}
+.pad.captured{cursor:none;box-shadow:inset 0 0 0 2px var(--color-accent-strong)}
+.pad.captured .pad-hint{opacity:1;color:var(--color-accent-ink)}
+.mbtns{display:grid;grid-template-columns:2fr 1fr 2fr;gap:1px}
+.mbtn{appearance:none;border:0;height:52px;background:var(--color-surface);color:var(--color-ink-2);font-size:var(--text-xs);font-weight:600;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;transition:background-color var(--dur-fast) var(--ease-out)}
+.mbtn:hover{background:var(--color-paper)}
+.mbtn.down,.mbtn:active{background:var(--color-accent-wash);color:var(--color-ink)}
+.mbtn:focus-visible{outline-offset:-3px}
+.pad-tools{display:flex;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap}
+
+/* ---------- control: keyboard ---------- */
+.typebox{display:flex;gap:var(--space-2);align-items:center}
+.typebox .input{flex:1;height:48px;font-size:1rem}
+.leds{display:flex;gap:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-ink-3)}
+.leds span{display:inline-flex;align-items:center;gap:5px}
+.leds span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--color-line-strong)}
+.leds span.on{color:var(--color-ink)}
+.leds span.on::before{background:var(--color-accent-strong)}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:var(--space-2)}
+.key{appearance:none;height:44px;min-width:0;padding:0 var(--space-1);border:1px solid var(--color-line-strong);border-bottom-width:2px;border-radius:var(--radius-s);background:var(--color-surface);color:var(--color-ink);font:560 var(--text-s)/1 var(--font-ui);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:manipulation;transition:background-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out)}
+.key:hover{background:var(--color-sunken)}
+.key:active{transform:translateY(1px);border-bottom-width:1px}
+.key[aria-pressed=true]{background:var(--color-accent);border-color:var(--color-accent-strong);color:var(--color-on-accent)}
+.key.wide{grid-column:span 2}
+.key svg{width:18px;height:18px;vertical-align:middle}
+.media{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--space-2)}
+.media .key{height:48px}
+
+/* ---------- lists ---------- */
+.nets{display:grid;border:1px solid var(--color-line);border-radius:var(--radius-m);overflow:hidden;max-height:300px;overflow-y:auto}
+.net{appearance:none;border:0;border-bottom:1px solid var(--color-line);background:var(--color-surface);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4);min-height:48px;text-align:left;cursor:pointer;width:100%}
+.net:last-child{border-bottom:0}
+.net:hover{background:var(--color-sunken)}
+.net[aria-pressed=true]{background:var(--color-accent-wash)}
+.net span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.net small{color:var(--color-ink-3);font-family:var(--font-mono);font-size:var(--text-xs)}
+.bars{display:inline-grid;grid-auto-flow:column;align-items:end;gap:2px;height:12px}
+.bars i{width:3px;background:var(--color-line-strong);border-radius:1px}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:12px}
+.bars i.on{background:var(--color-ink-2)}
+.progress{height:8px;border-radius:var(--radius-pill);background:var(--color-sunken);overflow:hidden;border:1px solid var(--color-line)}
+.progress i{display:block;height:100%;width:0;background:var(--color-accent-strong);transition:width var(--dur) var(--ease-out)}
+.drop{display:grid;place-items:center;gap:var(--space-1);text-align:center;min-height:96px;padding:var(--space-4);border:1px dashed var(--color-line-strong);border-radius:var(--radius-m);color:var(--color-ink-2);font-size:var(--text-s);cursor:pointer;transition:border-color var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out)}
+.drop:hover,.drop.over{border-color:var(--color-accent-strong);background:var(--color-accent-wash)}
+.drop:focus-within{outline:2px solid var(--color-focus);outline-offset:2px}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.secret-note{font-size:var(--text-xs);color:var(--color-ink-3)}
+.topics{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-ink-2);background:var(--color-sunken);border-radius:var(--radius-m);padding:var(--space-3);overflow-wrap:anywhere;display:grid;gap:2px}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--color-paper);overflow-y:auto;padding:max(var(--space-6),env(safe-area-inset-top)) max(var(--space-4),env(safe-area-inset-right)) var(--space-10) max(var(--space-4),env(safe-area-inset-left))}
+.sheet{max-width:520px;margin:0 auto;display:grid;gap:var(--space-6)}
+.steps{display:flex;gap:var(--space-2);font-size:var(--text-xs);color:var(--color-ink-3);font-weight:560}
+.steps span{flex:1;padding-top:var(--space-2);border-top:2px solid var(--color-line)}
+.steps span.done{border-color:var(--color-accent-strong);color:var(--color-ink-2)}
+.keybox{font-family:var(--font-mono);font-size:var(--text-m);letter-spacing:.02em}
+.scrim{position:fixed;inset:0;z-index:60;background:var(--color-scrim);display:grid;place-items:center;padding:var(--space-4)}
+.dialog{width:min(100%,420px);background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-l);padding:var(--space-6);display:grid;gap:var(--space-4);box-shadow:0 12px 40px oklch(0% 0 0 / .25)}
+.busy{position:fixed;inset:0;z-index:70;background:var(--color-paper);display:grid;place-items:center;text-align:center;padding:var(--space-6)}
+.busy div{display:grid;gap:var(--space-3);justify-items:center;max-width:36ch}
+.busy .spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--color-line-strong);border-top-color:var(--color-accent-strong);animation:spin .8s linear infinite}
+.busy p{color:var(--color-ink-2)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:1.5s!important}
+  .btn:active,.key:active{transform:none}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-pad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 15h18M12 15v5"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12L17 12h4"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.3" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-update" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M4 5v14l9-7zM15 5h2v14h-2zM19 5h2v14h-2z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></symbol>
+    <symbol id="i-vdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z" fill="currentColor"/><path d="M16 12h5"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z" fill="currentColor"/><path d="m16 9.5 5 5m0-5-5 5"/></symbol>
+    <symbol id="i-vup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z" fill="currentColor"/><path d="M16 12h5M18.5 9.5v5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  </defs>
+</svg>
+
+<header class="bar">
+  <div class="ident"><strong id="hName">ESPHID</strong><code id="hId"></code></div>
+  <div class="link" aria-live="polite"><span class="led" id="hLed" data-s="off"></span><span id="hLink">Offline</span><code id="hRtt">—</code></div>
+</header>
+
+<div class="shell" id="app" hidden>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="t-control" aria-controls="v-control" aria-selected="true"><svg aria-hidden="true"><use href="#i-pad"/></svg>Control</button>
+    <button class="tab" role="tab" id="t-status" aria-controls="v-status" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-pulse"/></svg>Status</button>
+    <button class="tab" role="tab" id="t-connect" aria-controls="v-connect" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-wifi"/></svg>Connect</button>
+    <button class="tab" role="tab" id="t-update" aria-controls="v-update" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-update"/></svg>Update</button>
+    <button class="tab" role="tab" id="t-device" aria-controls="v-device" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-chip"/></svg>Device</button>
+  </nav>
+  <main>
+    <div class="banner" id="rebootBanner" hidden><span>Restart the device to apply radio, HTTPS or Tailscale changes.</span><button class="btn small" data-action="reboot">Restart now</button></div>
+
+    <!-- CONTROL -->
+    <section class="view" id="v-control" role="tabpanel" aria-labelledby="t-control">
+      <div class="pad-wrap">
+        <div class="pad" id="pad" aria-label="Trackpad">
+          <p class="pad-hint" id="padHint">Drag to move · tap to click<br>two-finger tap for right click · two fingers to scroll</p>
+        </div>
+        <div class="mbtns">
+          <button class="mbtn" data-mb="1" aria-label="Left button">LEFT</button>
+          <button class="mbtn" data-mb="4" aria-label="Middle button">MID</button>
+          <button class="mbtn" data-mb="2" aria-label="Right button">RIGHT</button>
+        </div>
+      </div>
+      <div class="pad-tools">
+        <span class="chip" id="usbChip"><span class="led" data-s="off"></span><span>Host unknown</span></span>
+        <div class="actions">
+          <button class="btn small ghost" id="padSettingsBtn" aria-expanded="false" aria-controls="padSettings">Pointer settings</button>
+          <button class="btn small" id="captureBtn" hidden>Capture mouse &amp; keys</button>
+        </div>
+      </div>
+      <div class="panel" id="padSettings" hidden>
+        <div class="row">
+          <div class="field"><label for="sens">Speed <code id="sensVal"></code></label><input type="range" id="sens" min="0.4" max="4" step="0.1"></div>
+          <div class="field"><label for="accel">Acceleration <code id="accelVal"></code></label><input type="range" id="accel" min="0" max="2" step="0.1"></div>
+        </div>
+        <label class="switch"><span>Natural scrolling<small>Content follows your fingers.</small></span><input type="checkbox" id="natural"></label>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Keyboard</h2><div class="leds" aria-label="Host keyboard lights"><span id="ledNum">NUM</span><span id="ledCaps">CAPS</span><span id="ledScroll">SCRL</span></div></div>
+        <div class="typebox">
+          <label class="sr" for="typeIn">Type to send</label>
+          <input class="input" id="typeIn" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Type here — each key goes to the host" enterkeyhint="send">
+        </div>
+        <div class="keys" id="modKeys">
+          <button class="key" data-mod="1" aria-pressed="false">Ctrl</button>
+          <button class="key" data-mod="4" aria-pressed="false">Alt</button>
+          <button class="key" data-mod="2" aria-pressed="false">Shift</button>
+          <button class="key" data-mod="8" aria-pressed="false" title="Command / Windows">Cmd</button>
+          <button class="key" data-k="41">Esc</button>
+          <button class="key" data-k="43">Tab</button>
+          <button class="key" data-k="42">⌫</button>
+          <button class="key" data-k="40">Enter</button>
+          <button class="key" data-k="80" aria-label="Left arrow">←</button>
+          <button class="key" data-k="82" aria-label="Up arrow">↑</button>
+          <button class="key" data-k="81" aria-label="Down arrow">↓</button>
+          <button class="key" data-k="79" aria-label="Right arrow">→</button>
+          <button class="key" data-k="74">Home</button>
+          <button class="key" data-k="77">End</button>
+          <button class="key" data-k="75">PgUp</button>
+          <button class="key" data-k="78">PgDn</button>
+          <button class="key" data-k="76">Del</button>
+          <button class="key" id="fnToggle" aria-pressed="false" aria-controls="fKeys">F1–F12</button>
+        </div>
+        <div class="keys" id="fKeys" hidden></div>
+        <div class="actions"><button class="btn small ghost" id="releaseAll">Release all keys</button><span class="hint">Use this if a key seems stuck on the host.</span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Media</h2>
+        <div class="media">
+          <button class="key" data-c="182" aria-label="Previous track"><svg aria-hidden="true"><use href="#i-prev"/></svg></button>
+          <button class="key" data-c="205" aria-label="Play or pause"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+          <button class="key" data-c="181" aria-label="Next track"><svg aria-hidden="true"><use href="#i-next"/></svg></button>
+          <button class="key" data-c="234" aria-label="Volume down"><svg aria-hidden="true"><use href="#i-vdown"/></svg></button>
+          <button class="key" data-c="226" aria-label="Mute"><svg aria-hidden="true"><use href="#i-mute"/></svg></button>
+          <button class="key" data-c="233" aria-label="Volume up"><svg aria-hidden="true"><use href="#i-vup"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section class="view" id="v-status" role="tabpanel" aria-labelledby="t-status" hidden>
+      <div class="view-head"><h1>Status</h1><p>Live readings from the device, refreshed every few seconds.</p></div>
+      <dl class="readout" id="statusList"></dl>
+    </section>
+
+    <!-- CONNECT -->
+    <section class="view" id="v-connect" role="tabpanel" aria-labelledby="t-connect" hidden>
+      <div class="view-head"><h1>Connect</h1><p>How phones and other clients reach this device.</p></div>
+
+      <form class="panel" data-section="radio">
+        <div class="panel-head"><h2>Radio</h2><p>One 2.4 GHz radio serves WiFi and Bluetooth. Pick one for the lowest latency.</p></div>
+        <div class="seg" role="radiogroup" aria-label="Radio mode">
+          <label><input type="radio" name="radio_mode" value="both"><strong>Both</strong><small>WiFi and Bluetooth. Easiest; adds a little latency to each.</small></label>
+          <label><input type="radio" name="radio_mode" value="wifi"><strong>WiFi only</strong><small>Fastest over LAN, Tailscale and MQTT.</small></label>
+          <label><input type="radio" name="radio_mode" value="ble"><strong>Bluetooth only</strong><small>Fastest from a phone nearby. Turns WiFi off, including this page.</small></label>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Save radio mode</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+
+      <form class="panel" data-section="wifi">
+        <div class="panel-head"><h2>WiFi</h2><button class="btn small" type="button" data-action="scan">Scan networks</button></div>
+        <div class="nets" data-nets hidden></div>
+        <div class="row">
+          <div class="field"><label for="w-ssid">Network name</label><input class="input" id="w-ssid" name="wifi.ssid" autocomplete="off" maxlength="32"></div>
+          <div class="field"><label for="w-pass">Password</label><input class="input" id="w-pass" name="wifi.password" type="password" autocomplete="new-password" maxlength="64" data-secret="wifi.password_set"><span class="hint">Leave empty for an open network.</span></div>
+        </div>
+        <div class="field"><label for="w-host">Hostname</label><input class="input mono" id="w-host" name="wifi.hostname" maxlength="32" autocomplete="off" spellcheck="false"><span class="hint">Reachable as <code data-host-preview>esphid.local</code></span></div>
+        <label class="switch"><span>Setup hotspot as fallback<small>Starts the ESPHID network if WiFi can't connect for a minute.</small></span><input type="checkbox" name="wifi.ap_fallback"></label>
+        <div class="actions"><button class="btn primary" type="submit">Save WiFi</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+
+      <form class="panel" data-section="tailscale">
+        <div class="panel-head"><h2>Tailscale</h2><span class="chip" data-ts-chip><span class="led" data-s="off"></span><span>Off</span></span></div>
+        <p class="hint">Joins your tailnet so the app can reach the device from anywhere. Create an auth key in the Tailscale admin console under Settings → Keys.</p>
+        <label class="switch"><span>Enable Tailscale</span><input type="checkbox" name="tailscale.enabled"></label>
+        <div class="field"><label for="ts-key">Auth key</label><input class="input mono" id="ts-key" name="tailscale.auth_key" type="password" autocomplete="off" spellcheck="false" placeholder="tskey-auth-…" data-secret="tailscale.auth_key_set"></div>
+        <div class="row">
+          <div class="field"><label for="ts-host">Tailnet hostname</label><input class="input mono" id="ts-host" name="tailscale.hostname" autocomplete="off" spellcheck="false" maxlength="63"></div>
+          <div class="field"><label for="ts-ctl">Control server</label><input class="input mono" id="ts-ctl" name="tailscale.control_url" autocomplete="off" spellcheck="false" placeholder="Default (Tailscale)"><span class="hint">Only for Headscale.</span></div>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Save Tailscale</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+
+      <form class="panel" data-section="mqtt">
+        <div class="panel-head"><h2>MQTT</h2><span class="chip" data-mqtt-chip><span class="led" data-s="off"></span><span>Off</span></span></div>
+        <label class="switch"><span>Enable MQTT</span><input type="checkbox" name="mqtt.enabled"></label>
+        <div class="field"><label for="m-uri">Broker URI</label><input class="input mono" id="m-uri" name="mqtt.uri" placeholder="mqtts://broker.example.com:8883" autocomplete="off" spellcheck="false"></div>
+        <div class="row">
+          <div class="field"><label for="m-user">Username</label><input class="input" id="m-user" name="mqtt.username" autocomplete="off"></div>
+          <div class="field"><label for="m-pass">Password</label><input class="input" id="m-pass" name="mqtt.password" type="password" autocomplete="new-password" data-secret="mqtt.password_set"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="m-prefix">Topic prefix</label><input class="input mono" id="m-prefix" name="mqtt.topic_prefix" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="m-cid">Client ID</label><input class="input mono" id="m-cid" name="mqtt.client_id" autocomplete="off" spellcheck="false" placeholder="Automatic"></div>
+        </div>
+        <label class="switch"><span>Require access key in messages<small>Broker accounts alone can't type on the host.</small></span><input type="checkbox" name="mqtt.require_token"></label>
+        <div class="topics" data-topics></div>
+        <div class="actions"><button class="btn primary" type="submit">Save MQTT</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+
+      <form class="panel" data-section="https">
+        <div class="panel-head"><h2>HTTPS</h2></div>
+        <p class="hint">Serves this page and the API over TLS with a certificate made on the device. Apps pin its fingerprint the first time they connect.</p>
+        <label class="switch"><span>Enable HTTPS</span><input type="checkbox" name="https.enabled"></label>
+        <div class="field"><label for="h-port">Port</label><input class="input mono" id="h-port" name="https.port" type="number" min="1" max="65535" inputmode="numeric"></div>
+        <div class="field"><span class="label">Certificate fingerprint (SHA-256)</span><code class="topics" data-fp>—</code></div>
+        <div class="actions"><button class="btn primary" type="submit">Save HTTPS</button><button class="btn" type="button" data-action="regen">New certificate</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+    </section>
+
+    <!-- UPDATE -->
+    <section class="view" id="v-update" role="tabpanel" aria-labelledby="t-update" hidden>
+      <div class="view-head"><h1>Update</h1><p>Firmware installs to the spare slot. If the new version fails to start, the device rolls back by itself.</p></div>
+      <dl class="readout"><div><dt>Installed</dt><dd id="uVer">—</dd></div><div><dt>Variant</dt><dd id="uVar">—</dd></div><div><dt>Release source</dt><dd id="uRepo">—</dd></div></dl>
+      <div class="panel" id="otaProgress" hidden>
+        <div class="panel-head"><h2 id="otaTitle">Installing</h2><code id="otaPct">0%</code></div>
+        <div class="progress"><i id="otaBar"></i></div>
+        <p class="hint" id="otaNote">Keep this page open. The device restarts when it finishes.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Latest release</h2><button class="btn small" id="checkBtn">Check GitHub</button></div>
+        <p class="form-msg" id="checkMsg" aria-live="polite">Needs internet access in this browser.</p>
+      </div>
+      <form class="panel" id="otaUrlForm">
+        <h2>Install from a URL</h2>
+        <div class="field"><label for="otaUrl">Firmware URL (.bin)</label><input class="input mono" id="otaUrl" type="url" required spellcheck="false" autocomplete="off"></div>
+        <div class="field"><label for="otaSha">SHA-256 <span class="hint">optional</span></label><input class="input mono" id="otaSha" pattern="[0-9a-fA-F]{64}" spellcheck="false" autocomplete="off"></div>
+        <div class="actions"><button class="btn primary" type="submit">Install</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+      <form class="panel" id="otaFileForm">
+        <h2>Upload a file</h2>
+        <label class="drop" id="drop"><input type="file" id="otaFile" accept=".bin,application/octet-stream"><strong id="dropName">Choose an esphid-*.bin file</strong><span>or drop it here</span></label>
+        <div class="actions"><button class="btn primary" type="submit" disabled id="uploadBtn">Upload and install</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+    </section>
+
+    <!-- DEVICE -->
+    <section class="view" id="v-device" role="tabpanel" aria-labelledby="t-device" hidden>
+      <div class="view-head"><h1>Device</h1></div>
+      <form class="panel" data-section="general">
+        <h2>General</h2>
+        <div class="field"><label for="d-name">Name</label><input class="input" id="d-name" name="name" maxlength="32" autocomplete="off"></div>
+        <div class="row">
+          <div class="field"><label for="d-layout">Host keyboard layout</label><select class="input" id="d-layout" name="keyboard.layout"><option value="us">English (US)</option></select><span class="hint">Used when typing text. Match the layout set on the host.</span></div>
+          <div class="field"><label for="d-delay">Delay between typed characters (ms)</label><input class="input mono" id="d-delay" name="keyboard.type_delay_ms" type="number" min="0" max="200" inputmode="numeric"><span class="hint">0 is fastest. Raise it if a slow host drops characters.</span></div>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Save</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+      <form class="panel" id="tokenForm">
+        <div class="panel-head"><h2>Access key</h2></div>
+        <p class="hint">Apps and this page need it to control the device. Changing it signs out every other app.</p>
+        <div class="field"><label for="newToken">New access key</label><div class="with-action"><input class="input mono keybox" id="newToken" minlength="16" maxlength="64" required spellcheck="false" autocomplete="off"><button class="btn" type="button" data-gen="#newToken">Generate</button></div></div>
+        <div class="actions"><button class="btn primary" type="submit">Change access key</button><button class="btn ghost" type="button" data-copy="#newToken">Copy</button><span class="form-msg" aria-live="polite"></span></div>
+      </form>
+      <div class="panel">
+        <h2>Power</h2>
+        <div class="actions"><button class="btn" data-action="reboot">Restart device</button><button class="btn danger" id="resetBtn">Factory reset…</button><button class="btn ghost" id="signOut">Sign out of this browser</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- SETUP WIZARD -->
+<div class="overlay" id="setup" hidden>
+  <div class="sheet">
+    <div class="steps" aria-hidden="true"><span data-step="1">Access key</span><span data-step="2">WiFi</span><span data-step="3">Ready</span></div>
+
+    <form class="sheet" id="s1">
+      <div class="view-head"><h1>Set up <span data-name>ESPHID</span></h1><p>Choose an access key. The phone apps and this page use it to control the device, and it can't be shown again later. Store it in your password manager.</p></div>
+      <div class="field"><label for="claimToken">Access key</label><div class="with-action"><input class="input mono keybox" id="claimToken" minlength="16" maxlength="64" required spellcheck="false" autocomplete="off"><button class="btn" type="button" data-gen="#claimToken">New</button></div><span class="hint">16–64 characters. The generated key is 32 random letters and digits.</span></div>
+      <div class="actions"><button class="btn primary" type="submit">Save access key</button><button class="btn ghost" type="button" data-copy="#claimToken">Copy</button><span class="form-msg" aria-live="polite"></span></div>
+    </form>
+
+    <form class="sheet" id="s2" hidden>
+      <div class="view-head"><h1>Join your WiFi</h1><p>The device needs a 2.4 GHz network.</p></div>
+      <div class="actions"><button class="btn" type="button" data-action="scan">Scan networks</button></div>
+      <div class="nets" data-nets hidden></div>
+      <div class="field"><label for="s-ssid">Network name</label><input class="input" id="s-ssid" required maxlength="32" autocomplete="off"></div>
+      <div class="field"><label for="s-pass">Password</label><input class="input" id="s-pass" type="password" maxlength="64" autocomplete="new-password"></div>
+      <div class="actions"><button class="btn primary" type="submit">Connect</button><button class="btn ghost" type="button" id="skipWifi">Use Bluetooth only</button><span class="form-msg" aria-live="polite"></span></div>
+    </form>
+
+    <div class="sheet" id="s3" hidden>
+      <div class="view-head"><h1 id="s3Title">Connecting…</h1><p id="s3Text">Waiting for the device to join the network.</p></div>
+      <dl class="readout" id="s3List" hidden></dl>
+      <p class="hint" id="s3Hint" hidden></p>
+      <div class="actions"><button class="btn primary" id="s3Done" hidden>Open console</button><button class="btn ghost" id="s3Back" hidden>Try another network</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="scrim" id="login" hidden>
+  <form class="dialog" id="loginForm" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <h2 id="loginTitle"><svg width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><use href="#i-lock"/></svg>Enter access key</h2>
+    <p class="hint">This device is already set up. Use the access key chosen during setup.</p>
+    <div class="field"><label for="loginToken" class="sr">Access key</label><input class="input mono" id="loginToken" type="password" required autocomplete="current-password" spellcheck="false"></div>
+    <label class="switch"><span>Remember on this browser</span><input type="checkbox" id="remember" checked></label>
+    <div class="actions"><button class="btn primary" type="submit">Unlock</button><span class="form-msg" aria-live="polite"></span></div>
+  </form>
+</div>
+
+<!-- CONFIRM RESET -->
+<div class="scrim" id="resetDlg" hidden>
+  <form class="dialog" id="resetForm" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+    <h2 id="resetTitle">Factory reset</h2>
+    <p class="hint">Erases WiFi, the access key, Bluetooth pairings and every setting. The device restarts into setup mode with its ESPHID hotspot. Type <code id="resetId"></code> to confirm.</p>
+    <div class="field"><label for="resetInput" class="sr">Device ID</label><input class="input mono" id="resetInput" autocomplete="off" spellcheck="false" autocapitalize="characters"></div>
+    <div class="actions"><button class="btn danger" type="submit" id="resetGo" disabled>Erase and restart</button><button class="btn ghost" type="button" data-close>Cancel</button><span class="form-msg" aria-live="polite"></span></div>
+  </form>
+</div>
+
+<div class="busy" id="busy" hidden><div><span class="spinner" aria-hidden="true"></span><h2 id="busyTitle">Restarting</h2><p id="busyText">This page reconnects when the device is back.</p></div></div>
+
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* PROTO-BEGIN — binary protocol, see docs/PROTOCOL.md §2 */
+const te = new TextEncoder();
+function utf8Chunks(str, max = 255) {
+  const out = []; let cur = [];
+  for (const ch of str) {
+    const b = te.encode(ch);
+    if (cur.length + b.length > max) { out.push(Uint8Array.from(cur)); cur = []; }
+    for (const x of b) cur.push(x);
+  }
+  if (cur.length) out.push(Uint8Array.from(cur));
+  return out;
+}
+class Packet {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  u8(x) { this.a.push(x & 255); return this; }
+  i8(x) { return this.u8(clamp(Math.trunc(x), -127, 127)); }
+  i16(x) { x = clamp(Math.trunc(x), -32767, 32767); this.a.push(x & 255, (x >> 8) & 255); return this; }
+  u16(x) { this.a.push(x & 255, (x >>> 8) & 255); return this; }
+  u32(x) { this.a.push(x & 255, (x >>> 8) & 255, (x >>> 16) & 255, (x >>> 24) & 255); return this; }
+  bytes(b) { for (const x of b) this.a.push(x); return this; }
+  append(p) { for (const x of p.a) this.a.push(x); return this; }
+  build() { return Uint8Array.from(this.a); }
+  move(dx, dy) { return this.u8(0x01).i16(dx).i16(dy); }
+  buttons(b) { return this.u8(0x02).u8(b); }
+  scroll(w, p) { return this.u8(0x03).i8(w).i8(p); }
+  click(b) { return this.u8(0x04).u8(b); }
+  keyDown(u) { return this.u8(0x10).u8(u); }
+  keyUp(u) { return this.u8(0x11).u8(u); }
+  keyTap(m, u) { return this.u8(0x12).u8(m).u8(u); }
+  mods(m) { return this.u8(0x14).u8(m); }
+  textChunk(c) { return this.u8(0x15).u8(c.length).bytes(c); }
+  releaseAll() { return this.u8(0x16); }
+  consumerTap(u) { return this.u8(0x1A).u16(u); }
+  ping(n) { return this.u8(0x30).u32(n); }
+  getState() { return this.u8(0x31); }
+  auth(t) { const b = te.encode(t); return this.u8(0x40).u8(b.length).bytes(b); }
+}
+function decodeEvents(buf) {
+  const v = new DataView(buf), out = []; let i = 0;
+  while (i < v.byteLength) {
+    const op = v.getUint8(i++);
+    if (op === 0x80 && i + 8 <= v.byteLength) { out.push({ t: 'pong', nonce: v.getUint32(i, true), uptime: v.getUint32(i + 4, true) }); i += 8; }
+    else if (op === 0x81 && i + 1 <= v.byteLength) { out.push({ t: 'leds', leds: v.getUint8(i) }); i += 1; }
+    else if (op === 0x82 && i + 4 <= v.byteLength) { out.push({ t: 'state', flags: v.getUint8(i), leds: v.getUint8(i + 1), depth: v.getUint16(i + 2, true) }); i += 4; }
+    else if (op === 0x83 && i + 2 <= v.byteLength) { out.push({ t: 'error', code: v.getUint8(i), op: v.getUint8(i + 1) }); i += 2; }
+    else if (op === 0x84 && i + 1 <= v.byteLength) { out.push({ t: 'auth', result: v.getUint8(i) }); i += 1; }
+    else break;
+  }
+  return out;
+}
+/* US layout: printable ASCII → [modifiers, usage] (used for sticky-modifier shortcuts) */
+const US = (() => {
+  const m = {}, S = 2;
+  for (let i = 0; i < 26; i++) { m[String.fromCharCode(97 + i)] = [0, 4 + i]; m[String.fromCharCode(65 + i)] = [S, 4 + i]; }
+  '1234567890'.split('').forEach((c, i) => m[c] = [0, 30 + i]);
+  '!@#$%^&*()'.split('').forEach((c, i) => m[c] = [S, 30 + i]);
+  const p = [[' ', 0, 44], ['-', 0, 45], ['_', S, 45], ['=', 0, 46], ['+', S, 46], ['[', 0, 47], ['{', S, 47], [']', 0, 48], ['}', S, 48], ['\\', 0, 49], ['|', S, 49], [';', 0, 51], [':', S, 51], ["'", 0, 52], ['"', S, 52], ['`', 0, 53], ['~', S, 53], [',', 0, 54], ['<', S, 54], ['.', 0, 55], ['>', S, 55], ['/', 0, 56], ['?', S, 56]];
+  for (const [c, mod, u] of p) m[c] = [mod, u];
+  return m;
+})();
+/* KeyboardEvent.code → HID usage (page 0x07) */
+const CODE = (() => {
+  const m = {};
+  for (let i = 0; i < 26; i++) m['Key' + String.fromCharCode(65 + i)] = 4 + i;
+  for (let i = 1; i <= 9; i++) m['Digit' + i] = 29 + i;
+  m.Digit0 = 39;
+  for (let i = 1; i <= 12; i++) m['F' + i] = 57 + i;
+  for (let i = 13; i <= 24; i++) m['F' + i] = 91 + i;
+  for (let i = 1; i <= 9; i++) m['Numpad' + i] = 88 + i;
+  Object.assign(m, { Enter: 40, Escape: 41, Backspace: 42, Tab: 43, Space: 44, Minus: 45, Equal: 46, BracketLeft: 47, BracketRight: 48, Backslash: 49, Semicolon: 51, Quote: 52, Backquote: 53, Comma: 54, Period: 55, Slash: 56, CapsLock: 57, PrintScreen: 70, ScrollLock: 71, Pause: 72, Insert: 73, Home: 74, PageUp: 75, Delete: 76, End: 77, PageDown: 78, ArrowRight: 79, ArrowLeft: 80, ArrowDown: 81, ArrowUp: 82, NumLock: 83, NumpadDivide: 84, NumpadMultiply: 85, NumpadSubtract: 86, NumpadAdd: 87, NumpadEnter: 88, Numpad0: 98, NumpadDecimal: 99, IntlBackslash: 100, ContextMenu: 101, ControlLeft: 224, ShiftLeft: 225, AltLeft: 226, MetaLeft: 227, OSLeft: 227, ControlRight: 228, ShiftRight: 229, AltRight: 230, MetaRight: 231, OSRight: 231 });
+  return m;
+})();
+/* PROTO-END */
+
+/* ---------- storage (best effort) ---------- */
+const Store = {
+  get(k) { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch { return null; } },
+  set(k, v, persist = true) { try { (persist ? localStorage : sessionStorage).setItem(k, v); (persist ? sessionStorage : localStorage).removeItem(k); } catch {} },
+  del(k) { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch {} },
+  get token() { return this._t ?? (this._t = this.get('esphid.token')); },
+  persisted() { try { return localStorage.getItem('esphid.token') != null; } catch { return false; } },
+  setToken(t, persist = true) { this._t = t; if (t) this.set('esphid.token', t, persist); else this.del('esphid.token'); },
+};
+const Prefs = Object.assign({ sens: 1.6, accel: 1, natural: true }, (() => { try { return JSON.parse(Store.get('esphid.prefs') || '{}'); } catch { return {}; } })());
+const savePrefs = () => Store.set('esphid.prefs', JSON.stringify(Prefs));
+
+function genToken(n = 32) {
+  const a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', out = [];
+  const buf = new Uint8Array(n * 2);
+  while (out.length < n) { crypto.getRandomValues(buf); for (const b of buf) { if (b < 248 && out.length < n) out.push(a[b % 62]); } }
+  return out.join('');
+}
+
+/* ---------- JSON-RPC over HTTP ---------- */
+class RpcError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+let rpcId = 0;
+async function rpc(method, params, { auth = true, timeout = 10000 } = {}) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeout);
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth && Store.token) headers.Authorization = 'Bearer ' + Store.token;
+  try {
+    const r = await fetch('/api/rpc', { method: 'POST', headers, body: JSON.stringify({ id: ++rpcId, method, params: params || {} }), signal: ctl.signal, cache: 'no-store' });
+    let j; try { j = await r.json(); } catch { throw new RpcError(r.status || 500, 'The device sent an unexpected reply.'); }
+    if (j.error) throw new RpcError(j.error.code, j.error.message || 'Request failed');
+    return j.result;
+  } catch (e) {
+    if (e instanceof RpcError) { if (e.code === 401 && auth) App.needLogin(); throw e; }
+    throw new RpcError(0, e.name === 'AbortError' ? 'The device didn’t answer in time.' : 'Can’t reach the device.');
+  } finally { clearTimeout(t); }
+}
+const errText = e => e.code === 429 ? 'Too many attempts. Wait 30 seconds and try again.' : e.code === 401 ? 'The access key was not accepted.' : (e.message || 'Something went wrong.');
+
+/* ---------- live link (WebSocket) ---------- */
+const Link = {
+  ws: null, state: 'off', rtt: null, retry: 0, timer: 0, pingT: 0, nonce: 1, sent: new Map(),
+  fx: 0, fy: 0, pdx: 0, pdy: 0, sx: 0, sy: 0, pw: 0, ph: 0, kick: 0, lastUsbErr: 0,
+  connect() {
+    if (!Store.token || this.ws) return;
+    clearTimeout(this.timer);
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    let ws;
+    try { ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(Store.token)}`); } catch { return this.later(); }
+    ws.binaryType = 'arraybuffer';
+    this.ws = ws; this.set('wait');
+    ws.onopen = () => {
+      this.retry = 0; this.set('live');
+      this.raw(new Packet().getState().build());
+      clearInterval(this.pingT); this.ping(); this.pingT = setInterval(() => this.ping(), 2000);
+    };
+    ws.onmessage = ev => { if (typeof ev.data !== 'string') for (const e of decodeEvents(ev.data)) this.onEvent(e); };
+    ws.onclose = () => { if (this.ws === ws) { this.ws = null; clearInterval(this.pingT); this.rtt = null; this.set('off'); this.later(); } };
+    ws.onerror = () => {};
+  },
+  later() { clearTimeout(this.timer); if (!Store.token) return; this.timer = setTimeout(() => this.connect(), Math.min(8000, 600 * 2 ** this.retry++)); },
+  close() { clearTimeout(this.timer); clearInterval(this.pingT); const ws = this.ws; this.ws = null; if (ws) ws.close(); this.set('off'); },
+  reconnect() { this.close(); this.retry = 0; this.connect(); },
+  set(s) { this.state = s; UI.link(); },
+  open() { return this.ws && this.ws.readyState === 1; },
+  raw(u8) { if (this.open()) { this.ws.send(u8); return true; } return false; },
+  ping() {
+    const n = this.nonce = (this.nonce + 1) >>> 0;
+    this.sent.set(n, performance.now());
+    if (this.sent.size > 8) this.sent.delete(this.sent.keys().next().value);
+    this.raw(new Packet().ping(n).build());
+  },
+  onEvent(e) {
+    if (e.t === 'pong') { const t0 = this.sent.get(e.nonce); if (t0 != null) { this.sent.delete(e.nonce); const s = performance.now() - t0; this.rtt = this.rtt == null ? s : this.rtt * 0.7 + s * 0.3; UI.link(); } }
+    else if (e.t === 'leds') UI.leds(e.leds);
+    else if (e.t === 'state') { UI.leds(e.leds); UI.usb(!!(e.flags & 1), !!(e.flags & 2)); }
+    else if (e.t === 'auth' && e.result !== 0) { this.close(); if (e.result === 1) App.needLogin(); }
+    else if (e.t === 'error') { if (e.code === 3) { this.close(); App.needLogin(); } else if (e.code === 5) UI.usb(false, false); }
+  },
+  /* motion: accumulate fractions, coalesce while the socket is backed up */
+  move(dx, dy) {
+    this.fx += dx; this.fy += dy;
+    const ix = Math.trunc(this.fx), iy = Math.trunc(this.fy);
+    if (!ix && !iy) return;
+    this.fx -= ix; this.fy -= iy; this.pdx += ix; this.pdy += iy; this.pump();
+  },
+  scroll(w, p) {
+    this.sx += w; this.sy += p;
+    const iw = Math.trunc(this.sx), ip = Math.trunc(this.sy);
+    if (!iw && !ip) return;
+    this.sx -= iw; this.sy -= ip; this.pw += iw; this.ph += ip; this.pump();
+  },
+  drain(p) {
+    while (this.pdx || this.pdy) { const dx = clamp(this.pdx, -32767, 32767), dy = clamp(this.pdy, -32767, 32767); p.move(dx, dy); this.pdx -= dx; this.pdy -= dy; }
+    while (this.pw || this.ph) { const w = clamp(this.pw, -127, 127), h = clamp(this.ph, -127, 127); p.scroll(w, h); this.pw -= w; this.ph -= h; }
+    return p;
+  },
+  pump() {
+    if (!this.open()) { this.pdx = this.pdy = this.pw = this.ph = 0; return; }
+    if (this.ws.bufferedAmount === 0) { const p = this.drain(new Packet()); if (p.size) this.ws.send(p.build()); }
+    else if (!this.kick) this.kick = setTimeout(() => { this.kick = 0; this.pump(); }, 4);
+  },
+  /* ordered commands: flush pending motion first so drags start where expected */
+  send(p) { if (!this.open()) { UI.flashLink(); return; } const out = this.drain(new Packet()).append(p); this.ws.send(out.build()); },
+  text(s) { for (const c of utf8Chunks(s)) this.send(new Packet().textChunk(c)); },
+};
+
+/* ---------- UI helpers ---------- */
+const UI = {
+  link() {
+    const led = $('#hLed'), lab = $('#hLink'), rtt = $('#hRtt');
+    led.dataset.s = Link.state;
+    lab.textContent = Link.state === 'live' ? 'Live' : Link.state === 'wait' ? 'Connecting' : 'Offline';
+    rtt.textContent = Link.rtt == null ? '—' : (Link.rtt < 10 ? Link.rtt.toFixed(1) : Math.round(Link.rtt)) + ' ms';
+  },
+  flashLink() { const l = $('#hLink'); l.textContent = 'Not connected'; setTimeout(() => UI.link(), 1200); },
+  leds(v) { $('#ledNum').classList.toggle('on', !!(v & 1)); $('#ledCaps').classList.toggle('on', !!(v & 2)); $('#ledScroll').classList.toggle('on', !!(v & 4)); },
+  usb(mounted, suspended) {
+    const c = $('#usbChip'); c.querySelector('.led').dataset.s = mounted ? (suspended ? 'wait' : 'live') : 'bad';
+    c.lastElementChild.textContent = mounted ? (suspended ? 'Host asleep — input wakes it' : 'Host connected') : 'No USB host';
+  },
+  msg(form, text, tone) { const m = form && form.querySelector('.form-msg'); if (m) { m.textContent = text || ''; if (tone) m.dataset.tone = tone; else delete m.dataset.tone; } },
+  async busy(btn, fn) {
+    if (btn) { btn.disabled = true; btn.dataset.state = 'loading'; }
+    try { const r = await fn(); if (btn) { btn.dataset.state = 'success'; setTimeout(() => { if (btn.dataset.state === 'success') delete btn.dataset.state; }, 1600); } return r; }
+    catch (e) { if (btn) btn.dataset.state = 'error'; throw e; }
+    finally { if (btn) btn.disabled = false; }
+  },
+  overlay(title, text) { $('#busyTitle').textContent = title; $('#busyText').textContent = text; $('#busy').hidden = false; },
+  bars(rssi) { const n = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -78 ? 2 : 1; return `<span class="bars" aria-label="Signal ${n} of 4">${[1, 2, 3, 4].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`; },
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function copyText(text, btn) {
+  const done = () => { if (btn) { const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = t, 1400); } };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => fallback());
+  else fallback();
+  function fallback() { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch {} ta.remove(); }
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-gen]'); if (g) { const i = $(g.dataset.gen); i.value = genToken(); i.dispatchEvent(new Event('input')); }
+  const c = e.target.closest('[data-copy]'); if (c) copyText($(c.dataset.copy).value, c);
+  const r = e.target.closest('[data-action=reboot]'); if (r) App.reboot(r);
+  const x = e.target.closest('[data-close]'); if (x) x.closest('.scrim').hidden = true;
+  const s = e.target.closest('[data-action=scan]'); if (s) Wifi.scan(s, s.closest('form,.sheet'));
+});
+
+/* ---------- WiFi scan list (shared by setup + connect) ---------- */
+const Wifi = {
+  async scan(btn, scope) {
+    const list = scope.querySelector('[data-nets]'), ssid = scope.querySelector('input[name="wifi.ssid"], #s-ssid'), pass = scope.querySelector('input[type=password]');
+    try {
+      const r = await UI.busy(btn, () => rpc('wifi.scan', {}, { timeout: 15000 }));
+      const nets = (r.networks || []).filter(n => n.ssid);
+      list.hidden = false;
+      list.innerHTML = nets.length ? nets.map(n => `<button type="button" class="net" data-ssid="${esc(n.ssid)}" aria-pressed="false"><span>${esc(n.ssid)}</span>${n.auth && n.auth !== 'open' ? '<svg width="14" height="14" aria-label="Secured"><use href="#i-lock"/></svg>' : ''}<small>${esc(n.rssi)} dBm</small>${UI.bars(n.rssi)}</button>`).join('') : '<p class="hint" style="padding:12px 16px">No networks found. Move closer to the router and scan again.</p>';
+      list.onclick = e => { const b = e.target.closest('.net'); if (!b) return; $$('.net', list).forEach(x => x.setAttribute('aria-pressed', x === b)); ssid.value = b.dataset.ssid; pass && pass.focus(); };
+    } catch (e) { UI.msg(scope, errText(e), 'bad'); }
+  },
+};
+
+/* ---------- trackpad ---------- */
+const Pad = {
+  pts: new Map(), downAt: 0, travel: 0, maxPts: 0, lastT: 0, captured: false,
+  init() {
+    const pad = $('#pad');
+    pad.addEventListener('pointerdown', e => {
+      if (this.captured) return;
+      e.preventDefault(); pad.setPointerCapture(e.pointerId);
+      this.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pts.size === 1) { this.downAt = e.timeStamp; this.travel = 0; this.maxPts = 1; this.lastT = e.timeStamp; }
+      this.maxPts = Math.max(this.maxPts, this.pts.size);
+      pad.classList.add('active');
+    });
+    pad.addEventListener('pointermove', e => {
+      if (this.captured) return;
+      const p = this.pts.get(e.pointerId); if (!p) return;
+      const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      for (const ce of (evs.length ? evs : [e])) {
+        const dx = ce.clientX - p.x, dy = ce.clientY - p.y; p.x = ce.clientX; p.y = ce.clientY;
+        this.travel += Math.abs(dx) + Math.abs(dy);
+        if (this.pts.size === 1) { const [ax, ay] = this.accel(dx, dy, ce.timeStamp); Link.move(ax, ay); }
+        else if (this.pts.size === 2) { const k = (Prefs.natural ? 1 : -1) / 2 / 14; Link.scroll(dy * k, -dx * k); }
+      }
+    });
+    const end = e => {
+      if (!this.pts.delete(e.pointerId)) return;
+      if (this.pts.size) return;
+      pad.classList.remove('active');
+      if (e.type === 'pointerup' && e.timeStamp - this.downAt < 250 && this.travel < 10 * this.maxPts) Link.send(new Packet().click(this.maxPts === 1 ? 1 : this.maxPts === 2 ? 2 : 4));
+    };
+    pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+    pad.addEventListener('contextmenu', e => e.preventDefault());
+
+    /* mouse buttons — hold to drag */
+    let held = 0;
+    for (const b of $$('.mbtn')) {
+      const bit = +b.dataset.mb;
+      b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); held |= bit; b.classList.add('down'); Link.send(new Packet().buttons(held)); });
+      const up = () => { if (!(held & bit)) return; held &= ~bit; b.classList.remove('down'); Link.send(new Packet().buttons(held)); };
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+      b.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); Link.send(new Packet().click(bit)); } });
+    }
+
+    /* desktop capture: pointer lock + raw keys */
+    if (matchMedia('(pointer:fine)').matches && pad.requestPointerLock) {
+      const btn = $('#captureBtn'); btn.hidden = false;
+      btn.onclick = () => pad.requestPointerLock();
+      document.addEventListener('pointerlockchange', () => {
+        this.captured = document.pointerLockElement === pad;
+        pad.classList.toggle('captured', this.captured);
+        $('#padHint').innerHTML = this.captured ? 'Mouse and keyboard go to the host<br>Press Esc to release' : 'Drag to move · tap to click<br>two-finger tap for right click · two fingers to scroll';
+        if (!this.captured) { this.mb = 0; Link.send(new Packet().releaseAll()); }
+      });
+      this.mb = 0;
+      document.addEventListener('mousemove', e => { if (this.captured) Link.move(e.movementX, e.movementY); });
+      const map = [1, 4, 2, 8, 16];
+      document.addEventListener('mousedown', e => { if (!this.captured) return; e.preventDefault(); this.mb |= map[e.button] || 0; Link.send(new Packet().buttons(this.mb)); });
+      document.addEventListener('mouseup', e => { if (!this.captured) return; e.preventDefault(); this.mb &= ~(map[e.button] || 0); Link.send(new Packet().buttons(this.mb)); });
+      document.addEventListener('wheel', e => { if (!this.captured) return; e.preventDefault(); const k = e.deltaMode === 1 ? 1 / 3 : e.deltaMode === 2 ? 3 : 1 / 100; Link.scroll(-e.deltaY * k, e.deltaX * k); }, { passive: false });
+      const key = down => e => {
+        if (!this.captured) return;
+        const u = CODE[e.code]; if (u == null) return;
+        e.preventDefault(); if (e.repeat) return;
+        Link.send(down ? new Packet().keyDown(u) : new Packet().keyUp(u));
+      };
+      document.addEventListener('keydown', key(true), true); document.addEventListener('keyup', key(false), true);
+    }
+
+    /* settings */
+    const sens = $('#sens'), acc = $('#accel'), nat = $('#natural');
+    const show = () => { $('#sensVal').textContent = (+Prefs.sens).toFixed(1) + '×'; $('#accelVal').textContent = (+Prefs.accel).toFixed(1); };
+    sens.value = Prefs.sens; acc.value = Prefs.accel; nat.checked = !!Prefs.natural; show();
+    sens.oninput = () => { Prefs.sens = +sens.value; show(); savePrefs(); };
+    acc.oninput = () => { Prefs.accel = +acc.value; show(); savePrefs(); };
+    nat.onchange = () => { Prefs.natural = nat.checked; savePrefs(); };
+    $('#padSettingsBtn').onclick = e => { const p = $('#padSettings'); p.hidden = !p.hidden; e.currentTarget.setAttribute('aria-expanded', !p.hidden); };
+  },
+  accel(dx, dy, t) {
+    const dt = clamp(t - this.lastT, 1, 50); this.lastT = t;
+    const v = Math.hypot(dx, dy) / dt; // px per ms
+    const g = Prefs.sens * (1 + Prefs.accel * Math.min(v, 3) * 0.8);
+    return [dx * g, dy * g];
+  },
+};
+
+/* ---------- keyboard ---------- */
+const Keys = {
+  mods: 0, prev: '',
+  init() {
+    const inp = $('#typeIn');
+    const fk = $('#fKeys');
+    fk.innerHTML = Array.from({ length: 12 }, (_, i) => `<button class="key" data-k="${58 + i}">F${i + 1}</button>`).join('');
+    $('#fnToggle').onclick = e => { fk.hidden = !fk.hidden; e.currentTarget.setAttribute('aria-pressed', !fk.hidden); };
+    document.addEventListener('click', e => {
+      const k = e.target.closest('[data-k]'); if (k) { this.tap(+k.dataset.k); return; }
+      const m = e.target.closest('[data-mod]'); if (m) { this.mods ^= +m.dataset.mod; this.paintMods(); return; }
+      const c = e.target.closest('[data-c]'); if (c) Link.send(new Packet().consumerTap(+c.dataset.c));
+    });
+    $('#releaseAll').onclick = () => { this.mods = 0; this.paintMods(); Link.send(new Packet().releaseAll()); };
+    /* diff-based typing: works with IME, autocorrect and Android composition */
+    inp.addEventListener('input', () => {
+      const now = inp.value, before = this.prev;
+      let i = 0; const a = [...before], b = [...now];
+      while (i < a.length && i < b.length && a[i] === b[i]) i++;
+      const del = a.length - i, add = b.slice(i).join('');
+      if (this.mods && !del && [...add].length === 1 && US[add]) { const [m, u] = US[add]; this.tap(u, m); inp.value = before; return; }
+      if (del) { const p = new Packet(); for (let n = 0; n < del; n++) p.keyTap(0, 42); Link.send(p); }
+      if (add) Link.text(add.replace(/\r/g, ''));
+      this.prev = now;
+      if (now.length > 64) { inp.value = ''; this.prev = ''; }
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.isComposing) return;
+      const special = { Enter: 40, Escape: 41, Tab: 43, ArrowLeft: 80, ArrowRight: 79, ArrowUp: 82, ArrowDown: 81, Home: 74, End: 77, PageUp: 75, PageDown: 78, Delete: 76 }[e.key];
+      const hostMods = (e.ctrlKey ? 1 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0);
+      if (special != null) { e.preventDefault(); this.tap(special, hostMods | (e.shiftKey ? 2 : 0)); if (e.key === 'Enter') { inp.value = ''; this.prev = ''; } return; }
+      if (e.key === 'Backspace' && !inp.value) { e.preventDefault(); this.tap(42, hostMods); return; }
+      if (hostMods && CODE[e.code] != null) { e.preventDefault(); this.tap(CODE[e.code], hostMods | (e.shiftKey ? 2 : 0)); }
+    });
+  },
+  tap(u, extra = 0) { Link.send(new Packet().keyTap(this.mods | extra, u)); if (this.mods) { this.mods = 0; this.paintMods(); } },
+  paintMods() { $$('[data-mod]').forEach(b => b.setAttribute('aria-pressed', !!(this.mods & +b.dataset.mod))); },
+};
+
+/* ---------- config forms ---------- */
+const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
+const Config = {
+  cfg: null, info: null,
+  fill(cfg) {
+    this.cfg = cfg;
+    for (const el of $$('form[data-section] [name]')) {
+      const v = getPath(cfg, el.name);
+      if (el.type === 'radio') el.checked = v === el.value;
+      else if (el.type === 'checkbox') el.checked = !!v;
+      else if (el.dataset.secret) { if (el.dataset.ph == null) el.dataset.ph = el.getAttribute('placeholder') || ''; el.value = ''; el.placeholder = getPath(cfg, el.dataset.secret) ? 'Saved — leave blank to keep' : el.dataset.ph; }
+      else el.value = v ?? '';
+    }
+    this.previews();
+  },
+  previews() {
+    const host = $('#w-host').value || 'esphid';
+    $('[data-host-preview]').textContent = host + '.local';
+    const p = $('#m-prefix').value || ('esphid/' + (this.info?.id || ''));
+    $('[data-topics]').innerHTML = ['hid', 'hid/json', 'rpc/req', 'rpc/res', 'events', 'status'].map(t => `<span>${esc(p)}/${t}</span>`).join('');
+  },
+  patch(form) {
+    const out = {};
+    const put = (path, val) => { const ks = path.split('.'); let o = out; ks.slice(0, -1).forEach(k => o = o[k] ??= {}); o[ks.at(-1)] = val; };
+    for (const el of $$('[name]', form)) {
+      if (el.type === 'radio') { if (el.checked) put(el.name, el.value); continue; }
+      if (el.type === 'checkbox') { put(el.name, el.checked); continue; }
+      if (el.dataset.secret) { if (el.value !== '') put(el.name, el.value); continue; }
+      if (el.type === 'number') { if (el.value !== '') put(el.name, +el.value); continue; }
+      put(el.name, el.value.trim());
+    }
+    return out;
+  },
+  init() {
+    for (const form of $$('form[data-section]')) {
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = form.querySelector('[type=submit]');
+        UI.msg(form, '');
+        try {
+          const p = this.patch(form);
+          if (p.wifi && p.wifi.ssid !== (this.cfg?.wifi?.ssid ?? '') && !('password' in p.wifi)) p.wifi.password = '';
+          const r = await UI.busy(btn, () => rpc('config.set', p));
+          if (r.config) this.fill(r.config);
+          if (r.reboot_required) $('#rebootBanner').hidden = false;
+          if (form.dataset.section === 'wifi') UI.msg(form, 'Saved. The device is joining the network.', 'ok');
+          if (form.dataset.section === 'general') App.refresh();
+        } catch (err) { UI.msg(form, errText(err), 'bad'); }
+      });
+    }
+    $('#w-host').addEventListener('input', () => this.previews());
+    $('#m-prefix').addEventListener('input', () => this.previews());
+    $('[data-action=regen]').onclick = async e => {
+      const form = e.target.closest('form');
+      try { const r = await UI.busy(e.target, () => rpc('https.regenerate')); $('[data-fp]').textContent = r.fingerprint || '—'; UI.msg(form, 'New certificate made. Apps will ask you to trust it again.', 'ok'); }
+      catch (err) { UI.msg(form, errText(err), 'bad'); }
+    };
+  },
+};
+
+/* ---------- status ---------- */
+const fmtUptime = s => { s = s | 0; const d = (s / 86400) | 0, h = ((s % 86400) / 3600) | 0, m = ((s % 3600) / 60) | 0; return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
+function chip(el, on, label) { if (!el) return; el.querySelector('.led').dataset.s = on === true ? 'live' : on === 'wait' ? 'wait' : on === 'bad' ? 'bad' : 'off'; el.lastElementChild.textContent = label; }
+const Status = {
+  render(i) {
+    const w = i.wifi || {}, u = i.usb || {}, ts = i.tailscale || {}, mq = i.mqtt || {}, hs = i.https || {}, b = i.ble || {};
+    const rows = [
+      ['Firmware', `${i.fw_version || '—'}`], ['Variant', i.fw_variant || '—'], ['ESP-IDF', i.idf_version || '—'],
+      ['Uptime', i.uptime_s != null ? fmtUptime(i.uptime_s) : '—'], ['Free memory', i.free_heap != null ? (i.free_heap / 1024).toFixed(0) + ' KB' : '—'],
+      ['Radio mode', { both: 'WiFi + Bluetooth', wifi: 'WiFi only', ble: 'Bluetooth only' }[i.radio_mode] || '—'],
+      ['USB host', u.mounted ? (u.suspended ? 'Asleep' : 'Connected') : 'Not connected', u.mounted ? 'ok' : 'bad'],
+      ['WiFi', w.connected ? (w.ssid || 'Connected') : (w.mode === 'off' ? 'Off' : 'Not connected'), w.connected ? 'ok' : 'dim'],
+      ['IP address', w.ip || '—'], ['Signal', w.rssi != null && w.connected ? w.rssi + ' dBm' : '—'],
+      ['Setup hotspot', w.ap_active ? `On · ${w.ap_ip || '192.168.4.1'}` : 'Off', w.ap_active ? null : 'dim'],
+      ['MAC', w.mac || '—'],
+      ['Bluetooth', b.enabled ? `${b.connections || 0} connected` : 'Off', b.enabled ? null : 'dim'],
+      ['Tailscale', ts.enabled ? `${ts.state || '—'}${ts.ip ? ' · ' + ts.ip : ''}` : 'Off', ts.state === 'connected' ? 'ok' : ts.state === 'error' ? 'bad' : 'dim'],
+      ['MQTT', mq.enabled ? (mq.connected ? 'Connected' : 'Not connected') : 'Off', mq.connected ? 'ok' : mq.enabled ? 'bad' : 'dim'],
+      ['HTTPS', hs.enabled ? `Port ${hs.port}` : 'Off', hs.enabled ? null : 'dim'],
+    ];
+    $('#statusList').innerHTML = rows.map(([k, v, t]) => `<div><dt>${esc(k)}</dt><dd${t ? ` data-tone="${t}"` : ''}>${esc(v)}</dd></div>`).join('');
+    UI.usb(!!u.mounted, !!u.suspended); UI.leds(u.leds || 0);
+    chip($('[data-ts-chip]'), ts.state === 'connected' ? true : ts.state === 'connecting' ? 'wait' : ts.state === 'error' ? 'bad' : false, ts.enabled ? (ts.state === 'connected' ? (ts.ip || 'Connected') : ts.state === 'error' ? 'Error' : 'Connecting') : 'Off');
+    chip($('[data-mqtt-chip]'), mq.connected ? true : mq.enabled ? 'bad' : false, mq.enabled ? (mq.connected ? 'Connected' : 'Not connected') : 'Off');
+    $('[data-fp]').textContent = hs.fingerprint || '—';
+    $('#uVer').textContent = i.fw_version || '—'; $('#uVar').textContent = i.fw_variant || '—'; $('#uRepo').textContent = i.ota?.repo || 'Not set';
+    const url = $('#otaUrl'); if (!url.value && i.ota?.latest_url) url.value = i.ota.latest_url;
+    $('#hName').textContent = i.name || 'ESPHID'; $('#hId').textContent = i.id || '';
+    document.title = (i.name || 'ESPHID') + ' · Console';
+  },
+};
+
+/* ---------- OTA ---------- */
+const semver = v => String(v || '').replace(/^v/, '').split(/[.+-]/).slice(0, 3).map(n => parseInt(n, 10) || 0);
+const newer = (a, b) => { const x = semver(a), y = semver(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+const Ota = {
+  init() {
+    $('#checkBtn').onclick = e => this.check(e.currentTarget);
+    $('#otaUrlForm').addEventListener('submit', async e => {
+      e.preventDefault(); const f = e.currentTarget, btn = f.querySelector('[type=submit]');
+      const params = { url: $('#otaUrl').value.trim() }; const sha = $('#otaSha').value.trim(); if (sha) params.sha256 = sha.toLowerCase();
+      UI.msg(f, '');
+      try { await UI.busy(btn, () => rpc('ota.start', params)); this.track(); } catch (err) { UI.msg(f, errText(err), 'bad'); }
+    });
+    const file = $('#otaFile'), drop = $('#drop');
+    const pick = f => { this.file = f; $('#dropName').textContent = f ? `${f.name} · ${(f.size / 1024).toFixed(0)} KB` : 'Choose an esphid-*.bin file'; $('#uploadBtn').disabled = !f; };
+    file.onchange = () => pick(file.files[0]);
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); });
+    $('#otaFileForm').addEventListener('submit', e => { e.preventDefault(); if (this.file) this.upload(e.currentTarget); });
+  },
+  async check(btn) {
+    const m = $('#checkMsg'), repo = Config.info?.ota?.repo;
+    if (!repo) { m.textContent = 'This build has no release source. Install from a URL or a file instead.'; return; }
+    try {
+      const r = await UI.busy(btn, async () => { const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } }); if (!res.ok) throw new Error(res.status === 404 ? 'No published release yet.' : 'GitHub returned ' + res.status); return res.json(); });
+      const tag = r.tag_name || '', cur = Config.info.fw_version;
+      const variant = Config.info.fw_variant, asset = (r.assets || []).find(a => a.name === `esphid-${variant}.bin`);
+      if (newer(tag, cur)) {
+        m.innerHTML = `Version <strong>${esc(tag.replace(/^v/, ''))}</strong> is available. <a href="${esc(r.html_url)}" target="_blank" rel="noopener">Release notes</a>`;
+        if (asset) $('#otaUrl').value = asset.browser_download_url; else if (Config.info.ota?.latest_url) $('#otaUrl').value = Config.info.ota.latest_url;
+        m.dataset.tone = 'ok';
+      } else { m.textContent = `You're on the latest release (${cur}).`; delete m.dataset.tone; }
+    } catch (e) { m.textContent = e.message && !/fetch/i.test(e.message) ? e.message : 'Couldn’t reach GitHub. This browser needs internet access.'; m.dataset.tone = 'bad'; }
+  },
+  show(title, pct, note) {
+    $('#otaProgress').hidden = false; $('#otaTitle').textContent = title;
+    $('#otaPct').textContent = pct == null ? '' : Math.round(pct) + '%'; $('#otaBar').style.width = (pct || 0) + '%';
+    if (note) $('#otaNote').textContent = note;
+  },
+  async track() {
+    const from = Config.info?.fw_version;
+    for (;;) {
+      let s; try { s = await rpc('ota.status', {}, { timeout: 4000 }); } catch (e) { if (e.code) { this.show('Update failed', 0, errText(e)); return; } break; }
+      if (s.state === 'downloading') this.show('Downloading', s.progress);
+      else if (s.state === 'verifying') this.show('Verifying', 100);
+      else if (s.state === 'done') break;
+      else if (s.state === 'error') { this.show('Update failed', 0, s.error || 'The image was rejected.'); return; }
+      await sleep(700);
+    }
+    this.show('Restarting', 100, 'Installed. Waiting for the device to come back…');
+    await App.waitBack(from);
+  },
+  upload(form) {
+    const btn = form.querySelector('[type=submit]'); btn.disabled = true; btn.dataset.state = 'loading'; UI.msg(form, '');
+    const xhr = new XMLHttpRequest(); xhr.open('POST', '/api/ota/upload'); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (Store.token) xhr.setRequestHeader('Authorization', 'Bearer ' + Store.token);
+    xhr.upload.onprogress = e => { if (e.lengthComputable) this.show('Uploading', e.loaded / e.total * 100); };
+    xhr.onload = () => {
+      btn.disabled = false; delete btn.dataset.state;
+      let j = {}; try { j = JSON.parse(xhr.responseText || '{}'); } catch {}
+      const r = j.result || j;
+      if (xhr.status >= 200 && xhr.status < 300 && r.state !== 'error') { this.show('Restarting', 100, 'Installed. Waiting for the device to come back…'); App.waitBack(Config.info?.fw_version); }
+      else { const msg = j.error?.message || r.error || `Upload rejected (${xhr.status}).`; this.show('Update failed', 0, msg); UI.msg(form, msg, 'bad'); if (xhr.status === 401) App.needLogin(); }
+    };
+    xhr.onerror = () => { btn.disabled = false; delete btn.dataset.state; UI.msg(form, 'Upload interrupted. Check the connection and try again.', 'bad'); };
+    xhr.send(this.file);
+  },
+};
+
+/* ---------- setup wizard ---------- */
+const Setup = {
+  show(info) {
+    $('#app').hidden = true; $('#login').hidden = true; $('#setup').hidden = false;
+    $$('[data-name]').forEach(n => n.textContent = info.name || 'ESPHID');
+    const t = $('#claimToken'); if (!t.value) t.value = genToken();
+    this.step(1);
+  },
+  step(n) {
+    ['#s1', '#s2', '#s3'].forEach((s, i) => $(s).hidden = i + 1 !== n);
+    $$('.steps span').forEach(s => s.classList.toggle('done', +s.dataset.step <= n));
+    const first = $(`#s${n} input, #s${n} button`); first && first.focus({ preventScroll: true });
+  },
+  init() {
+    $('#s1').addEventListener('submit', async e => {
+      e.preventDefault(); const f = e.currentTarget, tok = $('#claimToken').value.trim();
+      if (!/^[\x21-\x7e]{16,64}$/.test(tok)) { UI.msg(f, 'Use 16–64 characters without spaces.', 'bad'); return; }
+      try { await UI.busy(f.querySelector('[type=submit]'), () => rpc('claim', { token: tok }, { auth: false })); Store.setToken(tok, true); this.step(2); }
+      catch (err) { if (err.code === 409) { UI.msg(f, 'This device was just claimed elsewhere. Sign in with its access key.', 'bad'); App.needLogin(); } else UI.msg(f, errText(err), 'bad'); }
+    });
+    $('#s2').addEventListener('submit', async e => {
+      e.preventDefault(); const f = e.currentTarget;
+      const patch = { wifi: { ssid: $('#s-ssid').value.trim(), password: $('#s-pass').value } };
+      try { await UI.busy(f.querySelector('[type=submit]'), () => rpc('config.set', patch)); this.step(3); this.watch(patch.wifi.ssid); }
+      catch (err) { UI.msg(f, errText(err), 'bad'); }
+    });
+    $('#skipWifi').onclick = async e => {
+      const f = e.target.closest('form');
+      try { await UI.busy(e.target, () => rpc('config.set', { radio_mode: 'ble' })); this.step(3); this.bleOnly(); }
+      catch (err) { UI.msg(f, errText(err), 'bad'); }
+    };
+    $('#s3Done').onclick = () => { $('#setup').hidden = true; App.start(); };
+    $('#s3Back').onclick = () => this.step(2);
+  },
+  async watch(ssid) {
+    $('#s3Title').textContent = 'Connecting…'; $('#s3Text').textContent = `Joining ${ssid}. This takes up to 30 seconds, and this hotspot may drop for a moment while the device changes channel.`;
+    $('#s3List').hidden = true; $('#s3Hint').hidden = true; $('#s3Done').hidden = true; $('#s3Back').hidden = true;
+    const until = Date.now() + 45000;
+    while (Date.now() < until) {
+      await sleep(1500);
+      let i; try { i = await rpc('info', {}, { timeout: 3000 }); } catch { continue; }
+      const w = i.wifi || {};
+      if (w.connected && w.ip) {
+        const host = (i.wifi.hostname || ('esphid-' + (i.id || '').toLowerCase())) + '.local';
+        $('#s3Title').textContent = 'Ready';
+        $('#s3Text').textContent = `${i.name} is on ${w.ssid}. Plug it into a computer and connect from the app.`;
+        $('#s3List').innerHTML = [['Network', w.ssid], ['IP address', w.ip], ['Address', host], ['Device ID', i.id]].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+        $('#s3List').hidden = false;
+        if (w.ap_active) { $('#s3Hint').textContent = `The setup hotspot turns off in about a minute. Reconnect this device to ${w.ssid}, then open http://${host} or http://${w.ip}.`; $('#s3Hint').hidden = false; }
+        $('#s3Done').hidden = false; return;
+      }
+    }
+    $('#s3Title').textContent = 'Couldn’t join the network';
+    $('#s3Text').textContent = 'Check the password and make sure it is a 2.4 GHz network.';
+    $('#s3Back').hidden = false;
+  },
+  bleOnly() {
+    $('#s3Title').textContent = 'Bluetooth only';
+    $('#s3Text').textContent = 'The device restarts with WiFi off, so this page will stop responding. Connect from the ESPHID app over Bluetooth with your access key.';
+    $('#s3List').hidden = true; $('#s3Hint').hidden = true; $('#s3Back').hidden = true; $('#s3Done').hidden = true;
+    rpc('system.reboot', { delay_ms: 500 }).catch(() => {});
+  },
+};
+
+/* ---------- app shell ---------- */
+const App = {
+  started: false, refreshT: 0, tab: 'control',
+  async boot() {
+    let info;
+    for (let tries = 0; ; tries++) {
+      try { info = await rpc('info', {}, { auth: false, timeout: 5000 }); break; }
+      catch (e) { UI.overlay('Can’t reach the device', 'Retrying… Check that this phone or computer is on the same network as the device.'); await sleep(Math.min(5000, 1000 * (tries + 1))); }
+    }
+    $('#busy').hidden = true;
+    Config.info = info;
+    try { const n = sessionStorage.getItem('esphid.notice'); if (n) { sessionStorage.removeItem('esphid.notice'); setTimeout(() => { const m = $('#checkMsg'); if (m) { m.textContent = n; m.dataset.tone = 'bad'; } }, 0); } } catch {}
+    $('#hName').textContent = info.name || 'ESPHID'; $('#hId').textContent = info.id || '';
+    if (!info.claimed) { if (Store.token) Store.setToken(null); return Setup.show(info); }
+    if (!Store.token) return this.needLogin();
+    try { const full = await rpc('info', {}, { timeout: 5000 }); if (!full.wifi) return this.needLogin(); Config.info = full; }
+    catch (e) { if (e.code !== 401) UI.overlay('Can’t reach the device', errText(e)); return; }
+    this.start();
+  },
+  needLogin() {
+    Link.close();
+    const d = $('#login'); if (!d.hidden) return;
+    d.hidden = false; $('#loginToken').value = ''; UI.msg($('#loginForm'), ''); setTimeout(() => $('#loginToken').focus(), 30);
+  },
+  async start() {
+    $('#app').hidden = false; $('#setup').hidden = true;
+    if (!this.started) { this.started = true; Pad.init(); Keys.init(); Config.init(); Ota.init(); this.tabs(); this.device(); }
+    Link.connect();
+    await this.refresh();
+    try { Config.fill(await rpc('config.get')); } catch {}
+  },
+  async refresh() {
+    try { const i = await rpc('info'); Config.info = i; Status.render(i); } catch {}
+  },
+  tabs() {
+    const tabs = $$('.tab');
+    const go = (t, focus) => {
+      tabs.forEach(b => { const on = b === t; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; $('#' + b.getAttribute('aria-controls')).hidden = !on; });
+      this.tab = t.id.slice(2); if (focus) t.focus();
+      if (this.tab === 'status' || this.tab === 'connect' || this.tab === 'update') this.refresh();
+      if (this.tab === 'connect') rpc('config.get').then(c => Config.fill(c)).catch(() => {});
+      window.scrollTo({ top: 0 });
+    };
+    tabs.forEach((t, i) => {
+      t.onclick = () => go(t);
+      t.onkeydown = e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (d) { e.preventDefault(); go(tabs[(i + d + tabs.length) % tabs.length], true); } };
+    });
+    clearInterval(this.refreshT);
+    this.refreshT = setInterval(() => { if (!document.hidden && this.tab === 'status') this.refresh(); }, 3000);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { if (Pad.captured) document.exitPointerLock(); } else if (!Link.ws && Store.token) Link.reconnect(); });
+  },
+  device() {
+    $('#newToken').value = genToken();
+    $('#tokenForm').addEventListener('submit', async e => {
+      e.preventDefault(); const f = e.currentTarget, tok = $('#newToken').value.trim();
+      if (!/^[\x21-\x7e]{16,64}$/.test(tok)) { UI.msg(f, 'Use 16–64 characters without spaces.', 'bad'); return; }
+      try { await UI.busy(f.querySelector('[type=submit]'), () => rpc('token.set', { token: tok })); Store.setToken(tok, Store.persisted()); Link.reconnect(); UI.msg(f, 'Access key changed. Update it in your apps.', 'ok'); }
+      catch (err) { UI.msg(f, errText(err), 'bad'); }
+    });
+    const dlg = $('#resetDlg'), inp = $('#resetInput'), go = $('#resetGo');
+    $('#resetBtn').onclick = () => { $('#resetId').textContent = Config.info?.id || ''; inp.value = ''; go.disabled = true; dlg.hidden = false; inp.focus(); };
+    inp.oninput = () => { go.disabled = inp.value.trim().toUpperCase() !== (Config.info?.id || '').toUpperCase(); };
+    $('#resetForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      try { await UI.busy(go, () => rpc('system.factory_reset')); Link.close(); Store.setToken(null); dlg.hidden = true; UI.overlay('Device erased', `It is restarting into setup mode. Join the ESPHID-${Config.info?.id || ''} WiFi network to set it up again.`); $('#busy .spinner').hidden = true; }
+      catch (err) { UI.msg(e.currentTarget, errText(err), 'bad'); }
+    });
+    $('#signOut').onclick = () => { Link.close(); Store.setToken(null); location.reload(); };
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { const s = $$('.scrim').find(x => !x.hidden && x.id !== 'login'); if (s) s.hidden = true; } });
+  },
+  async reboot(btn) {
+    try { await UI.busy(btn, () => rpc('system.reboot', { delay_ms: 300 })); } catch (e) { if (e.code) return; }
+    $('#rebootBanner').hidden = true; UI.overlay('Restarting', 'This page reconnects when the device is back.');
+    await this.waitBack();
+  },
+  async waitBack(fromVersion) {
+    Link.close(); $('#busy').hidden = false; await sleep(2500);
+    const until = Date.now() + 90000;
+    while (Date.now() < until) {
+      try { const i = await rpc('info', {}, { timeout: 2500 }); if (fromVersion && i.fw_version === fromVersion) { try { sessionStorage.setItem('esphid.notice', 'The device restarted on the previous firmware. The new image may have failed its self-check and rolled back.'); } catch {} } location.reload(); return; } catch { await sleep(1500); }
+    }
+    UI.overlay('Device hasn’t come back', 'If it switched to Bluetooth-only mode or another network, this page can’t reach it. Otherwise unplug it and plug it back in.');
+    $('#busy .spinner').hidden = true;
+  },
+};
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.currentTarget, tok = $('#loginToken').value.trim(), keep = $('#remember').checked;
+  const prev = Store.token; Store._t = tok;
+  try { await UI.busy(f.querySelector('[type=submit]'), () => rpc('config.get', {}, { auth: true })); Store.setToken(tok, keep); $('#login').hidden = true; App.start(); }
+  catch (err) { Store._t = prev; UI.msg(f, errText(err), 'bad'); }
+});
+Setup.init();
+App.boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+# Secrets: ASC_KEY_ID (App Store Connect API key ID), ASC_ISSUER_ID (issuer UUID),
+# ASC_KEY_P8_BASE64 (base64-encoded .p8 private key), APPLE_TEAM_ID (Apple team ID;
+# alternatively use the repository variable of the same name).
+# Variables: IOS_BUNDLE_ID (default dev.scalexy.esphid), IOS_BUILD_NUMBER_OFFSET
+# (nonnegative integer added to github.run_number, default 0),
+# IOS_SUBMIT_FOR_REVIEW ('true' enables App Store review submission), APPLE_TEAM_ID.
+# GITHUB_TOKEN is supplied by Actions for attaching release assets.
+name: iOS
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    env:
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'dev.scalexy.esphid' }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Version and signing availability
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BUILD_OFFSET: ${{ vars.IOS_BUILD_NUMBER_OFFSET || '0' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          tag = os.environ.get('RELEASE_TAG', '')
+          version = tag.removeprefix('v') if tag else '0.0.0'
+          build = int(os.environ['GITHUB_RUN_NUMBER']) + int(os.environ['BUILD_OFFSET'])
+          configured = all(os.environ.get(k) for k in ['ASC_KEY_ID','ASC_ISSUER_ID','ASC_KEY_P8_BASE64','APPLE_TEAM_ID'])
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'MARKETING_VERSION={version}\nBUILD_NUMBER={build}\nSIGNING_AVAILABLE={str(configured).lower()}\n')
+          PY
+      - name: Test Swift package
+        working-directory: ios/ESPHIDKit
+        run: swift test
+      - name: Generate and build simulator app
+        working-directory: ios
+        run: |
+          xcodegen generate
+          xcodebuild -project ESPHID.xcodeproj -scheme ESPHID -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath build build CODE_SIGNING_ALLOWED=NO IOS_BUNDLE_ID="$IOS_BUNDLE_ID" MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          ditto -c -k --sequesterRsrc --keepParent build/Build/Products/Debug-iphonesimulator/ESPHID.app ESPHID-simulator.zip
+      - name: Test app and library on iOS Simulator
+        working-directory: ios
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if "iPhone" in x["name"]))')
+          xcodebuild -project ESPHID.xcodeproj -scheme ESPHID -destination "platform=iOS Simulator,id=$DEVICE_ID" test CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ESPHID-simulator
+          path: ios/ESPHID-simulator.zip
+      - uses: ruby/setup-ruby@v1
+        if: github.event_name == 'release' && env.SIGNING_AVAILABLE == 'true'
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios
+      - name: Archive, export, and upload signed release
+        if: github.event_name == 'release' && env.SIGNING_AVAILABLE == 'true'
+        working-directory: ios
+        env:
+          IOS_SUBMIT_FOR_REVIEW: ${{ vars.IOS_SUBMIT_FOR_REVIEW }}
+        run: |
+          set -euo pipefail
+          ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          export ASC_KEY_PATH
+          trap 'rm -f "$ASC_KEY_PATH"' EXIT
+          python3 - <<'PY'
+          import base64,os,plistlib
+          path=os.environ['ASC_KEY_PATH']
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+          with os.fdopen(fd,'wb') as f: f.write(base64.b64decode(os.environ['ASC_KEY_P8_BASE64']))
+          with open(os.environ['RUNNER_TEMP']+'/ExportOptions.plist','wb') as f:
+              plistlib.dump({'method':'app-store-connect','signingStyle':'automatic','teamID':os.environ['APPLE_TEAM_ID'],'manageAppVersionAndBuildNumber':False},f)
+          PY
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -project ESPHID.xcodeproj -scheme ESPHID -configuration Release -destination 'generic/platform=iOS' -archivePath build/ESPHID.xcarchive archive "${AUTH[@]}" CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" IOS_BUNDLE_ID="$IOS_BUNDLE_ID" MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          xcodebuild -exportArchive -archivePath build/ESPHID.xcarchive -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath build/export "${AUTH[@]}"
+          export IPA_PATH="$PWD/build/export/ESPHID.ipa"
+          bundle exec fastlane ios release
+      - name: Collect release files
+        if: github.event_name == 'release'
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          cp ios/ESPHID-simulator.zip "$RUNNER_TEMP/release/esphid-ios-simulator-$MARKETING_VERSION.zip"
+          if [ "$SIGNING_AVAILABLE" = true ]; then
+            cp ios/build/export/ESPHID.ipa "$RUNNER_TEMP/release/esphid-ios-$MARKETING_VERSION.ipa"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'release'
+        with:
+          name: ios-release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+  release-assets:
+    # Only this job can write to the repository; build steps never see a write token.
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-release
+          path: release
+      - name: Attach to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" release/* --clobber

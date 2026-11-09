@@ -1,0 +1,15 @@
+menu "ESPHID"
+config ESPHID_FW_VARIANT
+    string "Firmware variant"
+    default "s3-n8"
+config ESPHID_OTA_REPO
+    string "GitHub owner/repository for OTA"
+    default ""
+config ESPHID_TAILSCALE
+    bool "Build native Tailscale support"
+    default y
+config ESPHID_LED_GPIO
+    int "WS2812 status LED GPIO (-1 disables)"
+    range -1 48
+    default -1
+endmenu

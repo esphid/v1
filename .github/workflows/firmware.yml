@@ -1,0 +1,123 @@
+name: Firmware
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Portable protocol tests
+        run: |
+          cmake -S firmware/test/host -B firmware/build/host
+          cmake --build firmware/build/host
+          ctest --test-dir firmware/build/host --output-on-failure
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.2
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [s3-n8, s3-n8r2, s3-n8r8]
+    env:
+      ESPHID_OTA_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build and package
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          . /opt/esp/idf/export.sh
+          if [[ -n "$RELEASE_TAG" ]]; then
+            export ESPHID_VERSION="${RELEASE_TAG#v}"
+          else
+            ESPHID_VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-dev)"
+            export ESPHID_VERSION
+          fi
+          firmware/tools/build.sh '${{ matrix.variant }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.variant }}
+          if-no-files-found: error
+          path: |
+            firmware/build/${{ matrix.variant }}/dist/
+            firmware/build/${{ matrix.variant }}/esphid.bin
+            firmware/build/${{ matrix.variant }}/*.elf
+            firmware/build/${{ matrix.variant }}/*.map
+            firmware/build/${{ matrix.variant }}/bootloader/bootloader.bin
+            firmware/build/${{ matrix.variant }}/partition_table/partition-table.bin
+            firmware/build/${{ matrix.variant }}/ota_data_initial.bin
+            firmware/build/${{ matrix.variant }}/flasher_args.json
+            firmware/build/${{ matrix.variant }}/sdkconfig
+  release:
+    if: github.event_name == 'release'
+    needs: [host-tests, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: artifacts
+      - name: Attach release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          mkdir release-assets
+          find artifacts -type f \( -name 'esphid-*.bin' -o -name 'manifest-*.json' \) -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum esphid-*.bin manifest-*.json > SHA256SUMS-firmware.txt
+          gh release upload "$RELEASE_TAG" ./* --clobber
+  pages:
+    if: github.event_name == 'release' && vars.ENABLE_PAGES_FLASHER == 'true'
+    needs: [host-tests, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: artifacts
+      - name: Prepare flasher
+        id: site
+        shell: bash
+        run: |
+          if [[ ! -f flasher/index.html ]]; then
+            echo 'Flasher absent; skipping Pages deployment.'
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir site
+          cp flasher/index.html site/
+          find artifacts -type f \( -name '*-factory.bin' -o -name 'manifest-*.json' \) -exec cp {} site/ \;
+          echo 'present=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.site.outputs.present == 'true'
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        if: steps.site.outputs.present == 'true'
+        id: deployment

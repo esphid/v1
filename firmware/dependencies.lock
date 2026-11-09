@@ -1,0 +1,100 @@
+dependencies:
+  espressif/cjson:
+    component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.7.19~2
+  espressif/esp_tinyusb:
+    component_hash: 0ff29f6113c4922691b3d7eee2f29af5fb98b799ef8b198a2956328f7c2296a9
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    - esp32p4
+    - esp32h4
+    - esp32s31
+    version: 3.0.0
+  espressif/led_strip:
+    component_hash: 28621486f77229aaf81c71f5e15d6fbf36c2949cf11094e07090593e659e7639
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.0.3
+  espressif/mdns:
+    component_hash: e81ca7a7f53ea34e78274df054da692c272e1315572876b237b1748e267c013b
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.11.3
+  espressif/mqtt:
+    component_hash: fb18bc3b65aa8c94693a9811ffc322cca8a65d92d5ec84983d3e385080e3969c
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.0
+  fugo101/microlink:
+    component_hash: 8f977f3fd6424794c92e478132caa810678157d89c4efd09d65f9b28f4742446
+    dependencies:
+    - name: espressif/cjson
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.7.19
+    - name: fugo101/wireguard_lwip
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.0.0
+    - name: idf
+      require: private
+      version: '>=6.0,<7.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.2.0
+  fugo101/wireguard_lwip:
+    component_hash: 50b83368a3014f906477db2d09574cfce88a666b1c5c31d088c768f1ebf286f6
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=6.0,<7.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.3
+  idf:
+    source:
+      type: idf
+    version: 6.0.2
+direct_dependencies:
+- espressif/cjson
+- espressif/esp_tinyusb
+- espressif/led_strip
+- espressif/mdns
+- espressif/mqtt
+- fugo101/microlink
+- idf
+manifest_hash: 1038f9cbf558214098e933305364f87df902306fb7e26d6aa5dbbfb6c95589a4
+target: esp32s3
+version: 3.0.0

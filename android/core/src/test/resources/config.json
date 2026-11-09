@@ -1,0 +1,11 @@
+{
+  "name": "ESPHID-A1B2C3",
+  "radio_mode": "both",
+  "wifi": {"ssid": "Home", "password_set": true, "hostname": "esphid-a1b2c3", "ap_fallback": true},
+  "https": {"enabled": false, "port": 443},
+  "mqtt": {"enabled": false, "uri": "mqtts://broker.example:8883", "username": "",
+           "password_set": false, "client_id": "", "topic_prefix": "esphid/A1B2C3",
+           "require_token": true},
+  "tailscale": {"enabled": false, "auth_key_set": false, "control_url": "", "hostname": "esphid-a1b2c3"},
+  "keyboard": {"layout": "us", "type_delay_ms": 0}
+}

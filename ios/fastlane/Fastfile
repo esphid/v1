@@ -1,0 +1,13 @@
+def asc_key
+  app_store_connect_api_key(key_id: ENV.fetch('ASC_KEY_ID'), issuer_id: ENV.fetch('ASC_ISSUER_ID'), key_filepath: ENV.fetch('ASC_KEY_PATH'), in_house: false)
+end
+platform :ios do
+  desc 'Upload the archived IPA to TestFlight; optionally submit the same build for review'
+  lane :release do
+    key = asc_key
+    upload_to_testflight(api_key: key, ipa: ENV.fetch('IPA_PATH'), skip_waiting_for_build_processing: ENV['IOS_SUBMIT_FOR_REVIEW'] != 'true')
+    if ENV['IOS_SUBMIT_FOR_REVIEW'] == 'true'
+      deliver(api_key: key, app_identifier: ENV.fetch('IOS_BUNDLE_ID', 'dev.scalexy.esphid'), app_version: ENV.fetch('MARKETING_VERSION'), build_number: ENV.fetch('BUILD_NUMBER'), submit_for_review: true, skip_binary_upload: true, skip_screenshots: !Dir.exist?('fastlane/screenshots'), skip_metadata: !Dir.exist?('fastlane/metadata'), force: true, run_precheck_before_submit: false)
+    end
+  end
+end
