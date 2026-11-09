@@ -1,6 +1,6 @@
 name: ESPHID
 options:
-  bundleIdPrefix: dev.scalexy
+  bundleIdPrefix: com.scalexy
   deploymentTarget:
     iOS: '17.0'
 packages:
@@ -8,7 +8,7 @@ packages:
     path: ESPHIDKit
 settings:
   base:
-    IOS_BUNDLE_ID: dev.scalexy.esphid
+    IOS_BUNDLE_ID: com.scalexy.esphid
     PRODUCT_BUNDLE_IDENTIFIER: $(IOS_BUNDLE_ID)
     SWIFT_VERSION: '5.0'
     MARKETING_VERSION: '0.0.0'
@@ -23,6 +23,11 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        # CI's manual signing sets ESPHID_PROFILE_SPECIFIER so the profile applies to this
+        # target only; a command-line PROVISIONING_PROFILE_SPECIFIER also reaches the
+        # Swift package targets, which some Xcode versions reject.
+        ESPHID_PROFILE_SPECIFIER: ''
+        PROVISIONING_PROFILE_SPECIFIER: $(ESPHID_PROFILE_SPECIFIER)
         TARGETED_DEVICE_FAMILY: '1,2'
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

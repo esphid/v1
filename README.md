@@ -168,9 +168,11 @@ secrets are missing.
 
 | Name | Kind | Purpose |
 |---|---|---|
-| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | secrets | App Store Connect team API key with the **Admin** role (cloud-managed distribution signing needs it). Used for signing and TestFlight upload. |
-| `APPLE_TEAM_ID` | secret or variable | Your Apple developer team ID |
-| `IOS_BUNDLE_ID` | variable | Defaults to `dev.scalexy.esphid` |
+| `APPLE_DEVELOPER_ACCOUNT_TEAM_ID` | secret | Apple developer team ID |
+| `APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY_ID`, `…_ISSUER_ID`, `…_KEY` | secrets | App Store Connect team API key (`…_KEY` is the `.p8` contents, as text or base64). Used for TestFlight upload, and for signing when no profile is given. |
+| `APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64`, `…_PASSWORD`, `…_IDENTITY` | secrets | Apple Distribution certificate for manual signing |
+| `APPLE_DEVELOPER_ACCOUNT_PROFILE_COM_SCALEXY_ESPHID_IOS_APP_STORE_BASE64` | secret | App Store provisioning profile for `com.scalexy.esphid`. With the certificate, the release is signed manually; without it, Xcode cloud-managed signing is used, which needs an **Admin** API key. |
+| `IOS_BUNDLE_ID` | variable | Defaults to `com.scalexy.esphid` |
 | `IOS_SUBMIT_FOR_REVIEW` | variable | `true` also submits the build for App Store review |
 | `IOS_BUILD_NUMBER_OFFSET` | variable | Added to the run number |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | Release signing |

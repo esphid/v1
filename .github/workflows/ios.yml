@@ -1,10 +1,19 @@
-# Secrets: ASC_KEY_ID (App Store Connect API key ID), ASC_ISSUER_ID (issuer UUID),
-# ASC_KEY_P8_BASE64 (base64-encoded .p8 private key), APPLE_TEAM_ID (Apple team ID;
-# alternatively use the repository variable of the same name).
-# Variables: IOS_BUNDLE_ID (default dev.scalexy.esphid), IOS_BUILD_NUMBER_OFFSET
-# (nonnegative integer added to github.run_number, default 0),
-# IOS_SUBMIT_FOR_REVIEW ('true' enables App Store review submission), APPLE_TEAM_ID.
-# GITHUB_TOKEN is supplied by Actions for attaching release assets.
+# iOS: Swift package tests and a simulator build + tests on every branch push and PR.
+# A published release also signs the app, uploads it to TestFlight and attaches the files.
+#
+# Signing secrets (organisation or repository level). Only the release-only `sign` job
+# references them; branch and PR builds never see them.
+#   APPLE_DEVELOPER_ACCOUNT_TEAM_ID
+#   APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY_ID, _ISSUER_ID
+#   APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY        .p8 contents (PEM text or base64)
+#   APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64, _PASSWORD, _IDENTITY
+#   APPLE_DEVELOPER_ACCOUNT_PROFILE_COM_SCALEXY_ESPHID_IOS_APP_STORE_BASE64
+# Certificate + profile present: manual signing with them. API key only: Xcode
+# cloud-managed signing (the key needs the Admin role). No API key: no signed build, and
+# the run stays green.
+# Variables: IOS_BUNDLE_ID (default com.scalexy.esphid), IOS_BUILD_NUMBER_OFFSET
+# (nonnegative integer added to the run number), IOS_SUBMIT_FOR_REVIEW ('true' submits
+# full releases, never pre-releases, for App Store review).
 name: iOS
 on:
   # Branch pushes only: a release's tag is built by the release event, not twice.
@@ -26,11 +35,11 @@ jobs:
     permissions:
       contents: read
     env:
-      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'dev.scalexy.esphid' }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'com.scalexy.esphid' }}
+    outputs:
+      release_version: ${{ steps.version.outputs.release_version }}
+      marketing_version: ${{ steps.version.outputs.marketing_version }}
+      build_number: ${{ steps.version.outputs.build_number }}
     steps:
       - uses: actions/checkout@v7
       - uses: maxim-lobanov/setup-xcode@v1
@@ -38,7 +47,8 @@ jobs:
           xcode-version: latest-stable
       - name: Install XcodeGen
         run: command -v xcodegen >/dev/null || brew install xcodegen
-      - name: Version and signing availability
+      - name: Version
+        id: version
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           BUILD_OFFSET: ${{ vars.IOS_BUILD_NUMBER_OFFSET || '0' }}
@@ -54,9 +64,11 @@ jobs:
           if not m:
               raise SystemExit(f'release tag {tag!r} must start with a number, e.g. v1.2.0')
           build = int(os.environ['GITHUB_RUN_NUMBER']) + int(os.environ['BUILD_OFFSET'])
-          configured = all(os.environ.get(k) for k in ['ASC_KEY_ID','ASC_ISSUER_ID','ASC_KEY_P8_BASE64','APPLE_TEAM_ID'])
+          out = {'release_version': version, 'marketing_version': m.group(0), 'build_number': build}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.writelines(f'{k}={v}\n' for k, v in out.items())
           with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'RELEASE_VERSION={version}\nMARKETING_VERSION={m.group(0)}\nBUILD_NUMBER={build}\nSIGNING_AVAILABLE={str(configured).lower()}\n')
+              f.writelines(f'{k.upper()}={v}\n' for k, v in out.items())
           PY
       - name: Test Swift package
         working-directory: ios/ESPHIDKit
@@ -76,65 +88,195 @@ jobs:
         with:
           name: ESPHID-simulator
           path: ios/ESPHID-simulator.zip
-      - uses: ruby/setup-ruby@v1
-        if: github.event_name == 'release' && env.SIGNING_AVAILABLE == 'true'
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: ios
-      - name: Archive, export, and upload signed release
-        if: github.event_name == 'release' && env.SIGNING_AVAILABLE == 'true'
-        working-directory: ios
-        env:
-          # Pre-releases stop at TestFlight; only full releases may be submitted for review.
-          IOS_SUBMIT_FOR_REVIEW: ${{ !github.event.release.prerelease && vars.IOS_SUBMIT_FOR_REVIEW || 'false' }}
-        run: |
-          set -euo pipefail
-          ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
-          export ASC_KEY_PATH
-          trap 'rm -f "$ASC_KEY_PATH"' EXIT
-          python3 - <<'PY'
-          import base64,os,plistlib
-          path=os.environ['ASC_KEY_PATH']
-          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
-          with os.fdopen(fd,'wb') as f: f.write(base64.b64decode(os.environ['ASC_KEY_P8_BASE64']))
-          with open(os.environ['RUNNER_TEMP']+'/ExportOptions.plist','wb') as f:
-              plistlib.dump({'method':'app-store-connect','signingStyle':'automatic','teamID':os.environ['APPLE_TEAM_ID'],'manageAppVersionAndBuildNumber':False},f)
-          PY
-          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-          xcodebuild -project ESPHID.xcodeproj -scheme ESPHID -configuration Release -destination 'generic/platform=iOS' -archivePath build/ESPHID.xcarchive archive "${AUTH[@]}" CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" IOS_BUNDLE_ID="$IOS_BUNDLE_ID" MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
-          xcodebuild -exportArchive -archivePath build/ESPHID.xcarchive -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath build/export "${AUTH[@]}"
-          export IPA_PATH="$PWD/build/export/ESPHID.ipa"
-          bundle exec fastlane ios release
-      - name: Collect release files
-        if: github.event_name == 'release'
-        run: |
-          mkdir -p "$RUNNER_TEMP/release"
-          cp ios/ESPHID-simulator.zip "$RUNNER_TEMP/release/esphid-ios-simulator-$RELEASE_VERSION.zip"
-          if [ "$SIGNING_AVAILABLE" = true ]; then
-            cp ios/build/export/ESPHID.ipa "$RUNNER_TEMP/release/esphid-ios-$RELEASE_VERSION.ipa"
-          fi
-      - uses: actions/upload-artifact@v7
-        if: github.event_name == 'release'
-        with:
-          name: ios-release
-          path: ${{ runner.temp }}/release/
           if-no-files-found: error
-  release-assets:
-    # Only this job can write to the repository; build steps never see a write token.
+
+  sign:
+    # The only job that can read the Apple secrets, and it only runs for published releases.
     if: github.event_name == 'release'
     needs: build
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    env:
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'com.scalexy.esphid' }}
+      MARKETING_VERSION: ${{ needs.build.outputs.marketing_version }}
+      BUILD_NUMBER: ${{ needs.build.outputs.build_number }}
+    steps:
+      - name: Choose signing mode
+        id: mode
+        env:
+          # Booleans only; no secret value reaches this step.
+          HAVE_API_KEY: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_TEAM_ID != '' && secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY_ID != '' && secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_ISSUER_ID != '' && secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY != '' }}
+          HAVE_CERT_AND_PROFILE: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64 != '' && secrets.APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD != '' && secrets.APPLE_DEVELOPER_ACCOUNT_PROFILE_COM_SCALEXY_ESPHID_IOS_APP_STORE_BASE64 != '' }}
+        run: |
+          if [ "$HAVE_API_KEY" != true ]; then
+            mode=none
+            echo 'App Store Connect API key secrets are not set: no signed iOS build.' >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$HAVE_CERT_AND_PROFILE" = true ]; then
+            mode=manual
+            echo 'Signing with the Apple Distribution certificate and the ESPHID App Store profile.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            mode=automatic
+            echo 'No ESPHID provisioning profile secret: using Xcode cloud-managed signing (needs an Admin API key).' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        if: steps.mode.outputs.mode != 'none'
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: steps.mode.outputs.mode != 'none'
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        if: steps.mode.outputs.mode != 'none'
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+      - uses: ruby/setup-ruby@v1
+        if: steps.mode.outputs.mode != 'none'
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+          working-directory: ios
+      - name: Install signing material
+        if: steps.mode.outputs.mode != 'none'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_TEAM_ID }}
+          ASC_KEY: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY }}
+          DIST_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          DIST_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_PROFILE_COM_SCALEXY_ESPHID_IOS_APP_STORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          # API key, used by xcodebuild (automatic mode) and fastlane (upload).
+          python3 - <<'PY'
+          import base64, os
+          raw = os.environ['ASC_KEY'].strip()
+          key = raw.encode() if raw.startswith('-----BEGIN') else base64.b64decode(raw)
+          if b'PRIVATE KEY' not in key:
+              raise SystemExit('APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY is neither a .p8 key nor base64 of one')
+          fd = os.open(os.path.join(os.environ['RUNNER_TEMP'], 'AuthKey.p8'), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+          with os.fdopen(fd, 'wb') as f:
+              f.write(key)
+          PY
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          [ "$MODE" = manual ] || exit 0
+
+          # Distribution certificate in a throwaway keychain.
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          kpass=$(openssl rand -hex 24)
+          security create-keychain -p "$kpass" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$kpass" "$keychain"
+          (umask 077; printf '%s' "$DIST_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12")
+          security import "$RUNNER_TEMP/dist.p12" -k "$keychain" -P "$DIST_PASSWORD" -f pkcs12 -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/dist.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kpass" "$keychain" >/dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+          # App Store provisioning profile; refuse one made for a different app.
+          profile="$RUNNER_TEMP/esphid.mobileprovision"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profile"
+          security cms -D -i "$profile" > "$RUNNER_TEMP/profile.plist"
+          uuid=$(plutil -extract UUID raw -o - "$RUNNER_TEMP/profile.plist")
+          appid=$(plutil -extract Entitlements.application-identifier raw -o - "$RUNNER_TEMP/profile.plist")
+          if [ "$appid" != "$APPLE_TEAM_ID.$IOS_BUNDLE_ID" ]; then
+            echo "::error::The provisioning profile is for $appid, not $APPLE_TEAM_ID.$IOS_BUNDLE_ID"
+            exit 1
+          fi
+          for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            cp "$profile" "$dir/$uuid.mobileprovision"
+          done
+          echo "PROFILE_UUID=$uuid" >> "$GITHUB_ENV"
+      - name: Archive and export
+        if: steps.mode.outputs.mode != 'none'
+        working-directory: ios
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_ISSUER_ID }}
+          DIST_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APPLE_DISTRIBUTION_CERTIFICATE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          common=(-project ESPHID.xcodeproj -scheme ESPHID -configuration Release -destination 'generic/platform=iOS'
+            -archivePath build/ESPHID.xcarchive DEVELOPMENT_TEAM="$APPLE_TEAM_ID" IOS_BUNDLE_ID="$IOS_BUNDLE_ID"
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER")
+          auth=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          if [ "$MODE" = manual ]; then
+            identity="${DIST_IDENTITY:-Apple Distribution}"
+            xcodebuild "${common[@]}" archive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" \
+              ESPHID_PROFILE_SPECIFIER="$PROFILE_UUID" OTHER_CODE_SIGN_FLAGS="--keychain $SIGNING_KEYCHAIN"
+            export_auth=()
+          else
+            identity="Apple Distribution"
+            xcodebuild "${common[@]}" archive "${auth[@]}" CODE_SIGN_STYLE=Automatic
+            export_auth=("${auth[@]}")
+          fi
+          IDENTITY="$identity" python3 - <<'PY'
+          import os, plistlib
+          opts = {'method': 'app-store-connect', 'teamID': os.environ['APPLE_TEAM_ID'], 'manageAppVersionAndBuildNumber': False}
+          if os.environ['MODE'] == 'manual':
+              opts.update(signingStyle='manual', signingCertificate=os.environ['IDENTITY'],
+                          provisioningProfiles={os.environ['IOS_BUNDLE_ID']: os.environ['PROFILE_UUID']})
+          else:
+              opts.update(signingStyle='automatic')
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'ExportOptions.plist'), 'wb') as f:
+              plistlib.dump(opts, f)
+          PY
+          xcodebuild -exportArchive -archivePath build/ESPHID.xcarchive -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath build/export ${export_auth[@]+"${export_auth[@]}"}
+      - name: Upload to TestFlight
+        if: steps.mode.outputs.mode != 'none'
+        working-directory: ios
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPLE_DEVELOPER_ACCOUNT_APP_STORE_CONNECT_ISSUER_ID }}
+          # Pre-releases stop at TestFlight; only full releases may be submitted for review.
+          IOS_SUBMIT_FOR_REVIEW: ${{ !github.event.release.prerelease && vars.IOS_SUBMIT_FOR_REVIEW || 'false' }}
+        run: IPA_PATH="$PWD/build/export/ESPHID.ipa" bundle exec fastlane ios release
+      - uses: actions/upload-artifact@v7
+        if: steps.mode.outputs.mode != 'none'
+        with:
+          name: ios-ipa
+          path: ios/build/export/ESPHID.ipa
+          if-no-files-found: error
+      - name: Remove signing material
+        if: always() && steps.mode.outputs.mode != 'none'
+        run: |
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$SIGNING_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/esphid.mobileprovision" "$RUNNER_TEMP/profile.plist"
+          if [ -n "${PROFILE_UUID:-}" ]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" \
+              "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          fi
+
+  release-assets:
+    # Only this job can write to the repository; build steps never see a write token.
+    # Runs even if signing failed, so the simulator build is still attached.
+    if: github.event_name == 'release' && !cancelled() && needs.build.result == 'success'
+    needs: [build, sign]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: ios-release
-          path: release
+          path: downloaded
       - name: Attach to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" release/* --clobber
+          RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          mkdir release
+          cp downloaded/ESPHID-simulator/ESPHID-simulator.zip "release/esphid-ios-simulator-$RELEASE_VERSION.zip"
+          if [ -f downloaded/ios-ipa/ESPHID.ipa ]; then
+            cp downloaded/ios-ipa/ESPHID.ipa "release/esphid-ios-$RELEASE_VERSION.ipa"
+          fi
+          gh release upload "$RELEASE_TAG" release/* --clobber
