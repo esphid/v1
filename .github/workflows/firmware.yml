@@ -14,7 +14,7 @@ jobs:
   host-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Portable protocol tests
         run: |
           cmake -S firmware/test/host -B firmware/build/host
@@ -30,7 +30,7 @@ jobs:
     env:
       ESPHID_OTA_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Build and package
@@ -47,7 +47,7 @@ jobs:
             export ESPHID_VERSION
           fi
           firmware/tools/build.sh '${{ matrix.variant }}'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: firmware-${{ matrix.variant }}
           if-no-files-found: error
@@ -68,7 +68,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: firmware-*
           path: artifacts
@@ -85,7 +85,8 @@ jobs:
           sha256sum esphid-*.bin manifest-*.json > SHA256SUMS-firmware.txt
           gh release upload "$RELEASE_TAG" ./* --clobber
   pages:
-    if: github.event_name == 'release' && vars.ENABLE_PAGES_FLASHER == 'true'
+    # The public flasher only ever serves full releases.
+    if: github.event_name == 'release' && !github.event.release.prerelease && vars.ENABLE_PAGES_FLASHER == 'true'
     needs: [host-tests, build]
     runs-on: ubuntu-latest
     permissions:
@@ -96,8 +97,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: firmware-*
           path: artifacts
@@ -114,10 +115,10 @@ jobs:
           cp flasher/index.html site/
           find artifacts -type f \( -name '*-factory.bin' -o -name 'manifest-*.json' \) -exec cp {} site/ \;
           echo 'present=true' >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: steps.site.outputs.present == 'true'
         with:
           path: site
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         if: steps.site.outputs.present == 'true'
         id: deployment

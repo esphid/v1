@@ -156,7 +156,10 @@ request**, and on **published releases**:
 | `android.yml` | Unit tests, lint, debug APK | Attaches `esphid-android-<v>.apk` / `.aab` (suffixed `-unsigned` without a keystore); with credentials, uploads to Google Play |
 
 To release: create a GitHub release with a tag like `v1.2.0` and publish it. The version
-comes from the tag; build numbers come from the workflow run number. Devices update from
+comes from the tag; build numbers come from the workflow run number. A release marked
+**pre-release** (e.g. `v1.2.0-rc.1`) builds and attaches the same files, but goes only to
+TestFlight (never review) and the Play *internal* track, skips the web flasher, and is not
+offered to devices as an update. On iOS it ships as version `1.2.0`. Devices update from
 `https://github.com/<repo>/releases/latest/download/esphid-<variant>.bin`, and the apps
 offer the update when the release is newer than the installed firmware.
 
