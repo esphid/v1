@@ -42,6 +42,16 @@ targets:
               NSExceptionAllowsInsecureHTTPLoads: true
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
+        # Explicit so App Store validation sees full iPad multitasking support.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
   ESPHIDTests:
     type: bundle.unit-test
     platform: iOS

@@ -177,9 +177,9 @@ struct KeyCapture: UIViewRepresentable {
     v.onHardwareKey = onHardwareKey
     v.onResign = { DispatchQueue.main.async { if isActive { isActive = false } } }
     if isActive, !v.isFirstResponder {
-      DispatchQueue.main.async { v.becomeFirstResponder() }
+      DispatchQueue.main.async { _ = v.becomeFirstResponder() }
     } else if !isActive, v.isFirstResponder {
-      DispatchQueue.main.async { v.resignFirstResponder() }
+      DispatchQueue.main.async { _ = v.resignFirstResponder() }
     }
   }
 }
