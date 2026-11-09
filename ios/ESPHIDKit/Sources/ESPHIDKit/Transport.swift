@@ -5,7 +5,7 @@ import Security
 
 /// All mutable transport state belongs to queue. @unchecked bridges delegate APIs.
 class Transport: NSObject, RPCChannel, @unchecked Sendable {
-  let queue = DispatchQueue(label: "dev.scalexy.esphid.transport", qos: .userInteractive)
+  let queue = DispatchQueue(label: "com.scalexy.esphid.transport", qos: .userInteractive)
   let device: SavedDevice
   let token: String?
   var events: (@Sendable ([HIDEvent]) -> Void)?

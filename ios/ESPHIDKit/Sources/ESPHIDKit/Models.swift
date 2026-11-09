@@ -294,7 +294,7 @@ public enum TokenGenerator {
   private func query(_ account: String) -> [String: Any] {
     [
       kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: "dev.scalexy.esphid", kSecAttrAccount as String: account,
+      kSecAttrService as String: "com.scalexy.esphid", kSecAttrAccount as String: account,
     ]
   }
   private func secret(_ account: String) -> String? {

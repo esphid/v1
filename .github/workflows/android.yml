@@ -106,7 +106,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: dev.scalexy.esphid
+          packageName: com.scalexy.esphid
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           # Pre-releases always go to the internal track, whatever PLAY_TRACK says.
           track: ${{ github.event.release.prerelease && 'internal' || vars.PLAY_TRACK || 'internal' }}

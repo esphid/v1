@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.scalexy.esphid.core"
+    namespace = "com.scalexy.esphid.core"
     compileSdk = 36
     defaultConfig {
         minSdk = 26

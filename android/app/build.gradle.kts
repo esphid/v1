@@ -4,10 +4,10 @@ plugins {
 }
 
 android {
-    namespace = "dev.scalexy.esphid"
+    namespace = "com.scalexy.esphid"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.scalexy.esphid"
+        applicationId = "com.scalexy.esphid"
         minSdk = 26
         targetSdk = 36
         versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()

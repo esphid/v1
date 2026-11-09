@@ -1,6 +1,6 @@
 # ESPHID core
 
-All public types live in `dev.scalexy.esphid.core`. Android API 26+, Kotlin, JDK 17.
+All public types live in `com.scalexy.esphid.core`. Android API 26+, Kotlin, JDK 17.
 No UI or permission dialogs are provided. Call lifecycle methods from one owner
 coroutine; `HidConnection` input methods may be called from the UI thread.
 

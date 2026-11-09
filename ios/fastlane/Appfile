@@ -1,2 +1,2 @@
-app_identifier(ENV.fetch('IOS_BUNDLE_ID', 'dev.scalexy.esphid'))
+app_identifier(ENV.fetch('IOS_BUNDLE_ID', 'com.scalexy.esphid'))
 team_id(ENV['APPLE_TEAM_ID'])

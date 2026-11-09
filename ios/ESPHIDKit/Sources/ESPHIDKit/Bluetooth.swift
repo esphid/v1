@@ -155,7 +155,7 @@ public struct DiscoveredDevice: Identifiable, Hashable, Sendable {
 private final class DiscoveryWorker: NSObject, CBCentralManagerDelegate, NetServiceDelegate,
   @unchecked Sendable
 {
-  let queue = DispatchQueue(label: "dev.scalexy.esphid.discovery")
+  let queue = DispatchQueue(label: "com.scalexy.esphid.discovery")
   var central: CBCentralManager!
   var browser: NWBrowser?
   var services = [NetService]()
