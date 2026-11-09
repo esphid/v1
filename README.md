@@ -168,7 +168,7 @@ secrets are missing.
 
 | Name | Kind | Purpose |
 |---|---|---|
-| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | secrets | App Store Connect API key (App Manager role). Used for cloud-managed signing and TestFlight upload. |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | secrets | App Store Connect team API key with the **Admin** role (cloud-managed distribution signing needs it). Used for signing and TestFlight upload. |
 | `APPLE_TEAM_ID` | secret or variable | Your Apple developer team ID |
 | `IOS_BUNDLE_ID` | variable | Defaults to `dev.scalexy.esphid` |
 | `IOS_SUBMIT_FOR_REVIEW` | variable | `true` also submits the build for App Store review |
