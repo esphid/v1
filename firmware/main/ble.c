@@ -9,6 +9,7 @@
 #include "store/config/ble_store_config.h"
 #include "os/os_mbuf.h"
 #include "esp_nimble_hci.h"
+#include "esp_log.h"
 /* IDF provides the store initializer without a public declaration. */
 void ble_store_config_init(void);
 static const ble_uuid128_t service_uuid = BLE_UUID128_INIT(
@@ -29,7 +30,8 @@ typedef struct {
     bool used, event_sub, rpc_sub, tx_busy, rpc_busy;
     uint32_t generation;
     uint16_t conn;
-    struct ble_npl_callout retry;
+    struct ble_npl_callout retry, tune;
+    bool tuned;
     session auth;
     char *rx, *tx;
     size_t rx_len, tx_len, tx_off;
@@ -79,6 +81,30 @@ static void rpc_next(ble_client *p) {
         p->tx_busy = true;
     } else
         ble_npl_callout_reset(&p->retry, ble_npl_time_ms_to_ticks32(2));
+}
+static const char *TAG = "ble";
+/* Link tuning runs once per connection, after the link is encrypted (or 2 s after
+ * connect as a fallback), and only if the central hasn't already picked a fast interval.
+ * Firing PHY/data-length/connection-update requests from both sides during connection
+ * setup and pairing makes LL procedures collide; many phone controllers then never
+ * answer and the link drops with 0x22 (LL Response Timeout, Android "GATT status 34").
+ * The central owns PHY (we only advertise a 2M preference) and connection priority;
+ * the controller negotiates data length from the suggested default set at sync. */
+static void tune_link(struct ble_npl_event *e) {
+    ble_client *p = ble_npl_event_get_arg(e);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    struct ble_gap_conn_desc d;
+    if (p->used && !p->tuned && !ble_gap_conn_find(p->conn, &d)) {
+        p->tuned = true;
+        if (d.conn_itvl > 12) { /* slower than 15 ms (units of 1.25 ms) */
+            struct ble_gap_upd_params u = {
+                .itvl_min = 6, .itvl_max = 12, .latency = 0, .supervision_timeout = 200};
+            int rc = ble_gap_update_params(p->conn, &u);
+            ESP_LOGI(TAG, "conn %u interval %.2f ms, requesting 7.5-15 ms (rc=%d)", p->conn,
+                     d.conn_itvl * 1.25, rc);
+        }
+    }
+    xSemaphoreGiveRecursive(mutex);
 }
 static void retry_rpc(struct ble_npl_event *e) {
     ble_client *p = ble_npl_event_get_arg(e);
@@ -263,12 +289,9 @@ static int gap_event(struct ble_gap_event *e, void *arg) {
                 p->conn = e->connect.conn_handle;
                 p->event_sub = p->rpc_sub = p->tx_busy = false;
                 session_init(&p->auth, TRANSPORT_BLE, event_send, p);
-                struct ble_gap_upd_params u = {
-                    .itvl_min = 6, .itvl_max = 12, .latency = 0, .supervision_timeout = 200};
-                ble_gap_update_params(p->conn, &u);
-                ble_gap_set_data_len(p->conn, 251, 2120);
-                ble_gap_set_prefered_le_phy(p->conn, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK,
-                                            0);
+                p->tuned = false;
+                /* Only the security request now; link tuning waits for encryption. */
+                ble_npl_callout_reset(&p->tune, ble_npl_time_ms_to_ticks32(2000));
                 ble_gap_security_initiate(p->conn);
             }
         }
@@ -276,7 +299,10 @@ static int gap_event(struct ble_gap_event *e, void *arg) {
         break;
     case BLE_GAP_EVENT_DISCONNECT: {
         ble_client *p = find(e->disconnect.conn.conn_handle);
+        ESP_LOGI(TAG, "conn %u disconnected, reason 0x%x", e->disconnect.conn.conn_handle,
+                 e->disconnect.reason);
         if (p) {
+            ble_npl_callout_stop(&p->tune);
             session_ended(&p->auth);
             p->auth.authenticated = false;
             ble_npl_callout_stop(&p->retry);
@@ -293,6 +319,14 @@ static int gap_event(struct ble_gap_event *e, void *arg) {
     case BLE_GAP_EVENT_ADV_COMPLETE:
         advertise();
         break;
+    case BLE_GAP_EVENT_ENC_CHANGE: {
+        ble_client *p = find(e->enc_change.conn_handle);
+        ESP_LOGI(TAG, "conn %u encryption %s (%d)", e->enc_change.conn_handle,
+                 e->enc_change.status ? "failed" : "on", e->enc_change.status);
+        if (p && !e->enc_change.status && !p->tuned)
+            ble_npl_callout_reset(&p->tune, ble_npl_time_ms_to_ticks32(250));
+        break;
+    }
     case BLE_GAP_EVENT_SUBSCRIBE: {
         ble_client *p = find(e->subscribe.conn_handle);
         if (p) {
@@ -353,6 +387,7 @@ static void sync_cb(void) {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     ble_hs_id_infer_auto(0, &address_type);
     ble_gap_set_prefered_default_le_phy(BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK);
+    ble_gap_write_sugg_def_data_len(251, 2120);
     advertise();
     transport_started = true;
     xSemaphoreGiveRecursive(mutex);
@@ -373,8 +408,10 @@ void ble_init(void) {
     assert(mutex && rpc_queue);
     assert(xTaskCreate(rpc_worker, "ble_rpc", 8192, NULL, 4, NULL) == pdPASS);
     ESP_ERROR_CHECK(nimble_port_init());
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 2; i++) {
         ble_npl_callout_init(&peers[i].retry, nimble_port_get_dflt_eventq(), retry_rpc, &peers[i]);
+        ble_npl_callout_init(&peers[i].tune, nimble_port_get_dflt_eventq(), tune_link, &peers[i]);
+    }
     enabled = true;
     ble_svc_gap_init();
     ble_svc_gatt_init();

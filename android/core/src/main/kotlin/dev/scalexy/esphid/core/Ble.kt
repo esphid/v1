@@ -30,6 +30,19 @@ internal object BleIds {
 internal fun shouldRetryGattAfterBond(status: Int, alreadyRetried: Boolean): Boolean =
     !alreadyRetried && (status == 5 || status == 15 || status == 137)
 
+/**
+ * Link drops worth a fresh connection attempt: 133 (generic Android GATT error),
+ * 8 (supervision timeout), 34/0x22 (LL response timeout), 35/0x23 and 42/0x2A
+ * (LL procedure collisions), 62/0x3E (connection failed to establish), 147/0x93
+ * (GATT connection timeout), and a clean disconnect while still setting up.
+ */
+internal fun isTransientGattFailure(message: String?): Boolean {
+    if (message == null) return false
+    if (message == "BLE disconnected") return true
+    val status = Regex("""^GATT status (\d+)$""").find(message)?.groupValues?.get(1)?.toIntOrNull() ?: return false
+    return status in setOf(8, 34, 35, 42, 62, 133, 147)
+}
+
 internal class BleWire(
     private val context: Context,
     private val address: String,
@@ -44,6 +57,9 @@ internal class BleWire(
     private var op: CompletableDeferred<Int>? = null
     private var mtu = 23
     private var discovered = false
+    // True once open() has finished; before that, link drops are retried inside open()
+    // instead of being reported to the connection as a failure.
+    private var opened = false
     // Accessed only on ESPHID-GATT, including receiver delivery and close().
     private var bondWait: CompletableDeferred<Unit>? = null
     private var closed = false
@@ -83,16 +99,13 @@ internal class BleWire(
                     if (status != 0) {
                         ready.completeExceptionally(RpcException.Transport("GATT status $status"))
                         op?.completeExceptionally(RpcException.Transport("GATT status $status"))
-                        if (discovered) failure(RpcException.Transport("GATT status $status"))
+                        if (opened) failure(RpcException.Transport("GATT status $status"))
                     } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                         try {
                             requireConnectPermission()
+                            // Connection priority now; the 2M PHY is requested only after setup
+                            // (see open()) so it can't collide with pairing/discovery.
                             g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                            g.setPreferredPhy(
-                                BluetoothDevice.PHY_LE_2M_MASK,
-                                BluetoothDevice.PHY_LE_2M_MASK,
-                                BluetoothDevice.PHY_OPTION_NO_PREFERRED,
-                            )
                             if (!g.discoverServices())
                                 ready.completeExceptionally(
                                     RpcException.Transport("Service discovery rejected")
@@ -105,7 +118,7 @@ internal class BleWire(
                         val e = RpcException.Transport("BLE disconnected")
                         ready.completeExceptionally(e)
                         op?.completeExceptionally(e)
-                        failure(e)
+                        if (opened) failure(e)
                     }
                 }
             }
@@ -320,36 +333,61 @@ internal class BleWire(
             manager.adapter?.getRemoteDevice(address)
                 ?: throw RpcException.Transport("Bluetooth unavailable")
         awaitBond(device)
-        var connected = false
-        for (attempt in 0..2) {
-            ready = CompletableDeferred()
-            onGattThread {
-                requireConnectPermission()
-                if (closed) throw RpcException.Transport("BLE closed")
-                gatt =
-                    device.connectGatt(
-                        context,
-                        false,
-                        callback,
-                        BluetoothDevice.TRANSPORT_LE,
-                        BluetoothDevice.PHY_LE_2M_MASK,
-                        handler,
-                    )
-            }
+        var attempt = 0
+        while (true) {
             try {
-                withTimeout(15000) { ready.await() }
-                connected = true
+                connectAndSetUp(device)
                 break
             } catch (e: Exception) {
-                onGattThread {
-                    runCatching { gatt?.close() }
-                    gatt = null
-                }
-                if (attempt == 2 || e.message?.contains("133") != true) throw e
-                delay(400L * (attempt + 1))
+                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                val stop = runCatching {
+                    onGattThread {
+                        runCatching { gatt?.disconnect() }
+                        runCatching { gatt?.close() }
+                        gatt = null
+                        discovered = false
+                        closed
+                    }
+                }.getOrDefault(true)
+                if (stop || attempt >= 2 || !isTransientGattFailure(e.message)) throw e
+                attempt++
+                delay(400L * attempt)
             }
         }
-        check(connected)
+        onGattThread {
+            opened = true
+            // Ask for the 2M PHY only now that the link is up, encrypted and configured:
+            // a PHY update racing pairing or another LL procedure can drop the link (0x22).
+            runCatching {
+                requireConnectPermission()
+                gatt?.setPreferredPhy(
+                    BluetoothDevice.PHY_LE_2M_MASK,
+                    BluetoothDevice.PHY_LE_2M_MASK,
+                    BluetoothDevice.PHY_OPTION_NO_PREFERRED,
+                )
+            }
+        }
+    }
+
+    private suspend fun connectAndSetUp(device: BluetoothDevice) {
+        ready = CompletableDeferred()
+        onGattThread {
+            requireConnectPermission()
+            if (closed) throw RpcException.Transport("BLE closed")
+            discovered = false
+            // Connect on the default 1M PHY; requesting 2M here makes the stack start a PHY
+            // update during connection setup.
+            gatt =
+                device.connectGatt(
+                    context,
+                    false,
+                    callback,
+                    BluetoothDevice.TRANSPORT_LE,
+                    BluetoothDevice.PHY_LE_1M_MASK,
+                    handler,
+                )
+        }
+        withTimeout(15000) { ready.await() }
         operation { gatt!!.requestMtu(517) }
         for (id in listOf(BleIds.events, BleIds.rpc)) operation(retryAfterBond = true) {
             val g = gatt!!
